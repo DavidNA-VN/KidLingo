@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE assignments
+  ADD COLUMN IF NOT EXISTS instructions TEXT;
+
+COMMIT;

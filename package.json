@@ -1,0 +1,9 @@
+{
+  "name": "doodle-english-classroom",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev:frontend": "pnpm --dir frontend dev",
+    "build:frontend": "pnpm --dir frontend build"
+  }
+}
