@@ -1,6 +1,6 @@
 # Doodle English Classroom
 
-Nền tảng học tiếng Anh cho học sinh tiểu học. Giáo viên quản lý lớp, lesson, tài liệu PDF/video, bài giao, dashboard, bài nộp và chat. Phụ huynh quản lý hồ sơ con, cho con học bằng tài liệu và chơi doodle vocabulary game có AI nhận dạng.
+An English learning platform for primary school students. Teachers manage classes, lessons, PDF/video materials, assignments, dashboards, submissions, and chat. Parents manage their children's profiles, provide learning materials, and play AI-powered vocabulary doodle games.
 
 ## Project Layout
 
