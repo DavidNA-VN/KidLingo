@@ -19,6 +19,7 @@ from app.schemas.parent import (
     ParentClassPublic,
     ParentJoinClassResponse,
 )
+from app.services.assignment_status_service import close_overdue_assignments
 
 
 def get_parent_child(db: Session, parent_id: UUID, child_id: UUID) -> Child | None:
@@ -194,6 +195,10 @@ def list_child_assignments(db: Session, parent_id: UUID, child_id: UUID) -> list
     child = get_parent_child(db, parent_id, child_id)
     if not child:
         return None
+    class_ids = db.scalars(
+        select(ClassChild.class_id).where(ClassChild.child_id == child_id, ClassChild.status == "ACTIVE")
+    ).all()
+    close_overdue_assignments(db, class_ids=list(class_ids))
     rows = db.execute(
         select(Assignment, Class, User, Lesson)
         .join(ClassChild, ClassChild.class_id == Assignment.class_id)
@@ -203,7 +208,7 @@ def list_child_assignments(db: Session, parent_id: UUID, child_id: UUID) -> list
         .where(
             ClassChild.child_id == child_id,
             ClassChild.status == "ACTIVE",
-            Assignment.status == "PUBLISHED",
+            Assignment.status.in_(["PUBLISHED", "CLOSED"]),
         )
         .order_by(Assignment.due_at.asc().nulls_last(), Assignment.created_at.desc())
     ).all()
@@ -219,6 +224,7 @@ def get_child_assignment_detail(
     child = get_parent_child(db, parent_id, child_id)
     if not child:
         return None
+    close_overdue_assignments(db, assignment_ids=[assignment_id])
     row = db.execute(
         select(Assignment, Class, User, Lesson)
         .join(ClassChild, ClassChild.class_id == Assignment.class_id)
@@ -229,7 +235,7 @@ def get_child_assignment_detail(
             Assignment.id == assignment_id,
             ClassChild.child_id == child_id,
             ClassChild.status == "ACTIVE",
-            Assignment.status == "PUBLISHED",
+            Assignment.status.in_(["PUBLISHED", "CLOSED"]),
         )
     ).first()
     if not row:

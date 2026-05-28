@@ -7,7 +7,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from app.models.assignment import Assignment
-from app.models.child import Child
+from app.models.child import Child, ClassChild
 from app.models.classroom import Class
 from app.models.lesson import Lesson, LessonMaterial
 from app.models.submission import Submission
@@ -17,6 +17,38 @@ from app.services.submission_types import PDF_ANSWER, UNGRADED_STATUSES, is_grad
 
 
 LOW_CONFIDENCE_THRESHOLD = 0.7
+
+
+def _validate_filter_context(
+    db: Session,
+    teacher_id: UUID,
+    *,
+    class_id: UUID | None,
+    assignment_id: UUID | None,
+    child_id: UUID | None,
+) -> None:
+    if not class_id:
+        return
+
+    class_exists = db.scalar(select(Class.id).where(Class.id == class_id, Class.teacher_id == teacher_id))
+    if not class_exists:
+        raise ValueError("CLASS_NOT_FOUND")
+
+    if assignment_id:
+        assignment_class_id = db.scalar(select(Assignment.class_id).where(Assignment.id == assignment_id))
+        if assignment_class_id != class_id:
+            raise ValueError("ASSIGNMENT_NOT_IN_CLASS")
+
+    if child_id:
+        active_membership = db.scalar(
+            select(ClassChild.child_id).where(
+                ClassChild.class_id == class_id,
+                ClassChild.child_id == child_id,
+                ClassChild.status == "ACTIVE",
+            )
+        )
+        if not active_membership:
+            raise ValueError("CHILD_NOT_IN_CLASS")
 
 
 def review_reason(submission: Submission) -> str | None:
@@ -112,6 +144,14 @@ def list_teacher_submissions(
     date_from: datetime | None = None,
     date_to: datetime | None = None,
 ) -> list[TeacherSubmissionListItem]:
+    _validate_filter_context(
+        db,
+        teacher_id,
+        class_id=class_id,
+        assignment_id=assignment_id,
+        child_id=child_id,
+    )
+
     filters = [Submission.submission_type == PDF_ANSWER]
     if class_id:
         filters.append(Class.id == class_id)

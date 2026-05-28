@@ -1,8 +1,8 @@
-import { AlertTriangle, CheckCircle2, FileText, MessageSquareText, Save, Search } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileText, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { getStoredToken } from "../lib/auth";
-import type { TeacherClassSummary } from "../lib/teacher";
+import { getTeacherClassDetail, type TeacherClassDetail, type TeacherClassSummary } from "../lib/teacher";
 import {
   getTeacherSubmissionDetail,
   listTeacherSubmissions,
@@ -26,13 +26,24 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+const GRADING_STATUS_LABELS: Record<string, string> = {
+  SUBMITTED: "Chưa chấm",
+  GRADED: "Đã chấm",
+  RETURNED: "Đã trả bài",
+  NEEDS_REVISION: "Cần sửa",
+};
+
+function gradingStatusLabel(status: string) {
+  return GRADING_STATUS_LABELS[status] ?? status;
+}
+
 function ResultBadge({ item }: { item: TeacherSubmissionListItem }) {
   if (item.submission_type === "PDF_ANSWER") {
     const color =
       item.grading_status === "GRADED" || item.grading_status === "RETURNED"
         ? "bg-[#e8f7ef] text-[#067647]"
         : "bg-[#fff3e6] text-[#b54708]";
-    return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${color}`}>{item.grading_status}</span>;
+    return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${color}`}>{gradingStatusLabel(item.grading_status)}</span>;
   }
   if (!item.is_correct) {
     return <span className="rounded-full bg-[#fff3e6] px-2.5 py-1 text-xs font-bold text-[#b54708]">Sai</span>;
@@ -49,22 +60,29 @@ function SubmissionDetailPanel({
   isSaving,
 }: {
   detail: TeacherSubmissionDetail;
-  onSave: (payload: { feedback: string; reviewed: boolean; score: string; maxScore: string; gradingStatus: string }) => Promise<void>;
+  onSave: (payload: { feedback: string; score: string }) => Promise<void>;
   isSaving: boolean;
 }) {
   const [feedback, setFeedback] = useState(detail.teacher_feedback ?? "");
-  const [reviewed, setReviewed] = useState(Boolean(detail.reviewed_at));
   const [score, setScore] = useState(detail.score != null ? String(detail.score) : "");
-  const [maxScore, setMaxScore] = useState(String(detail.max_score ?? 10));
-  const [gradingStatus, setGradingStatus] = useState(detail.grading_status ?? "SUBMITTED");
+  const maxScore = detail.max_score ?? 10;
+  const scoreValue = score === "" ? null : Number.parseFloat(score);
+  const isScoreInvalid = scoreValue == null || Number.isNaN(scoreValue) || scoreValue < 0 || scoreValue > maxScore;
 
   useEffect(() => {
     setFeedback(detail.teacher_feedback ?? "");
-    setReviewed(Boolean(detail.reviewed_at));
     setScore(detail.score != null ? String(detail.score) : "");
-    setMaxScore(String(detail.max_score ?? 10));
-    setGradingStatus(detail.grading_status ?? "SUBMITTED");
-  }, [detail.id, detail.teacher_feedback, detail.reviewed_at]);
+  }, [detail.id, detail.teacher_feedback, detail.score]);
+
+  function handleScoreChange(value: string) {
+    if (!value) {
+      setScore("");
+      return;
+    }
+    const nextScore = Number.parseFloat(value);
+    if (Number.isNaN(nextScore)) return;
+    setScore(String(Math.min(nextScore, maxScore)));
+  }
 
   return (
     <div className="min-w-0 space-y-4">
@@ -74,11 +92,6 @@ function SubmissionDetailPanel({
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <h2 className="text-xl font-bold">{detail.child_name}</h2>
               <ResultBadge item={detail} />
-              {detail.reviewed_at ? (
-                <span className="rounded-full bg-[#eaf3ff] px-2.5 py-1 text-xs font-bold text-[#155dcc]">Đã review</span>
-              ) : (
-                <span className="rounded-full bg-[#f2f4f7] px-2.5 py-1 text-xs font-bold text-[#667085]">Chưa review</span>
-              )}
             </div>
             <p className="text-sm text-[#667085]">
               {detail.class_name} · {detail.assignment_title}
@@ -91,11 +104,11 @@ function SubmissionDetailPanel({
               <div className="text-xs text-[#667085]">Điểm</div>
             </div>
             <div className="rounded-lg bg-[#f8fafc] px-4 py-3">
-              <div className="text-2xl font-bold">{detail.max_score ?? 10}</div>
+              <div className="text-2xl font-bold">{maxScore}</div>
               <div className="text-xs text-[#667085]">Thang điểm</div>
             </div>
-            <div className="rounded-lg bg-[#f8fafc] px-4 py-3">
-              <div className="text-2xl font-bold">{detail.grading_status}</div>
+            <div className="flex min-h-[72px] flex-col items-center justify-center rounded-lg bg-[#f8fafc] px-3 py-3">
+              <div className="text-center text-sm font-bold leading-tight">{gradingStatusLabel(detail.grading_status)}</div>
               <div className="text-xs text-[#667085]">Trạng thái</div>
             </div>
           </div>
@@ -135,15 +148,10 @@ function SubmissionDetailPanel({
             <Save size={18} />
             Chấm điểm và phản hồi
           </h3>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <input value={score} onChange={(event) => setScore(event.target.value)} type="number" min="0" max="100" step="0.5" className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]" placeholder="Điểm" />
-            <input value={maxScore} onChange={(event) => setMaxScore(event.target.value)} type="number" min="1" max="100" step="0.5" className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]" placeholder="Thang điểm" />
-            <select value={gradingStatus} onChange={(event) => setGradingStatus(event.target.value)} className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]">
-              <option value="SUBMITTED">Chưa chấm</option>
-              <option value="GRADED">Đã chấm</option>
-              <option value="RETURNED">Đã trả bài</option>
-              <option value="NEEDS_REVISION">Cần sửa</option>
-            </select>
+          <div className="mt-4 grid gap-2">
+            <label className="text-xs font-bold uppercase text-[#667085]">Điểm</label>
+            <input value={score} onChange={(event) => handleScoreChange(event.target.value)} type="number" min="0" max={maxScore} step="0.5" className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]" placeholder={`Tối đa ${maxScore}`} />
+            <div className="text-xs text-[#667085]">Điểm phải nhỏ hơn hoặc bằng {maxScore}.</div>
           </div>
           <textarea
             value={feedback}
@@ -151,25 +159,13 @@ function SubmissionDetailPanel({
             className="mt-4 min-h-32 w-full rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]"
             placeholder="Nhận xét cho phụ huynh và học sinh..."
           />
-          <label className="mt-3 flex items-center gap-2 text-sm font-semibold text-[#344054]">
-            <input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} />
-            Đánh dấu đã review
-          </label>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
-              onClick={() => onSave({ feedback, reviewed, score, maxScore, gradingStatus })}
-              disabled={isSaving}
+              onClick={() => onSave({ feedback, score })}
+              disabled={isSaving || isScoreInvalid}
               className="rounded-lg bg-[#1d73e8] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
             >
-              Lưu feedback
-            </button>
-            <button
-              disabled
-              className="inline-flex items-center gap-2 rounded-lg border border-[#d0d8e4] px-4 py-2.5 text-sm font-bold text-[#667085] disabled:opacity-60"
-              title="Sẽ nối ở Phase 08"
-            >
-              <MessageSquareText size={16} />
-              Mở trao đổi
+              Lưu
             </button>
           </div>
           <div className="mt-4 rounded-lg bg-[#f8fafc] p-3 text-sm text-[#667085]">
@@ -188,6 +184,8 @@ export function TeacherSubmissions({ classes, selectedClassId, selectedAssignmen
   const [detail, setDetail] = useState<TeacherSubmissionDetail | null>(null);
   const [classFilter, setClassFilter] = useState(selectedClassId ?? "ALL");
   const [assignmentFilter, setAssignmentFilter] = useState(selectedAssignmentId ?? "ALL");
+  const [childFilter, setChildFilter] = useState("ALL");
+  const [classDetail, setClassDetail] = useState<TeacherClassDetail | null>(null);
   const [correctFilter, setCorrectFilter] = useState("ALL");
   const [speechFilter, setSpeechFilter] = useState("ALL");
   const [reviewedFilter, setReviewedFilter] = useState("ALL");
@@ -195,31 +193,40 @@ export function TeacherSubmissions({ classes, selectedClassId, selectedAssignmen
   const [lateFilter, setLateFilter] = useState("ALL");
   const [scoreMin, setScoreMin] = useState("");
   const [scoreMax, setScoreMax] = useState("");
-  const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const filteredItems = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return items;
-    return items.filter(
-      (item) =>
-        item.child_name.toLowerCase().includes(query) ||
-        item.assignment_title.toLowerCase().includes(query) ||
-        item.parent_email.toLowerCase().includes(query),
-    );
-  }, [items, search]);
+  const activeRoster = useMemo(
+    () => classDetail?.roster.filter((child) => child.status === "ACTIVE" && child.membership_status === "ACTIVE") ?? [],
+    [classDetail],
+  );
+  const classAssignments = classDetail?.assignments ?? [];
+  const isClassContextReady = classDetail?.id === classFilter;
+  const isClassLocked = Boolean(selectedClassId);
+  const selectedAssignmentMaxScore = classAssignments.find((item) => item.id === assignmentFilter)?.max_score ?? 100;
+  const selectedClassName = classes.find((item) => item.id === classFilter)?.name ?? "lớp đã chọn";
+
+  function handleScoreMaxFilterChange(value: string) {
+    if (!value) {
+      setScoreMax("");
+      return;
+    }
+    const nextScore = Number.parseFloat(value);
+    if (Number.isNaN(nextScore)) return;
+    setScoreMax(String(Math.min(nextScore, selectedAssignmentMaxScore)));
+  }
 
   async function loadSubmissions(selectFirst = false) {
-    if (!token) return;
+    if (!token || classFilter === "ALL" || !isClassContextReady) return;
     setIsLoading(true);
     setError("");
     try {
       const result = await listTeacherSubmissions(token, {
         class_id: classFilter,
         assignment_id: assignmentFilter,
+        child_id: childFilter,
         is_correct: correctFilter,
         speech_passed: speechFilter,
         reviewed: reviewedFilter,
@@ -248,29 +255,62 @@ export function TeacherSubmissions({ classes, selectedClassId, selectedAssignmen
     }
   }
 
+  async function loadClassContext(classId: string) {
+    if (!token || classId === "ALL") {
+      setClassDetail(null);
+      return;
+    }
+    setError("");
+    try {
+      setClassDetail(await getTeacherClassDetail(token, classId));
+    } catch (requestError) {
+      setClassDetail(null);
+      setError(requestError instanceof Error ? requestError.message : "Không tải được dữ liệu lớp");
+    }
+  }
+
   useEffect(() => {
     loadSubmissions(true);
-  }, [token, classFilter, assignmentFilter, correctFilter, speechFilter, reviewedFilter, gradingFilter, lateFilter, scoreMin, scoreMax]);
+  }, [token, classFilter, isClassContextReady, assignmentFilter, childFilter, correctFilter, speechFilter, reviewedFilter, gradingFilter, lateFilter, scoreMin, scoreMax]);
+
+  useEffect(() => {
+    if (scoreMax && Number.parseFloat(scoreMax) > selectedAssignmentMaxScore) {
+      setScoreMax(String(selectedAssignmentMaxScore));
+    }
+  }, [scoreMax, selectedAssignmentMaxScore]);
+
+  useEffect(() => {
+    if (classFilter !== "ALL") return;
+    const nextClassId = selectedClassId ?? classes[0]?.id;
+    if (nextClassId) setClassFilter(nextClassId);
+  }, [classes, selectedClassId, classFilter]);
+
+  useEffect(() => {
+    setAssignmentFilter("ALL");
+    setChildFilter("ALL");
+    setSelectedId(null);
+    setDetail(null);
+    loadClassContext(classFilter);
+  }, [token, classFilter]);
 
   useEffect(() => {
     if (!selectedClassId || selectedClassId === classFilter) return;
     setClassFilter(selectedClassId);
-    setSelectedId(null);
-    setDetail(null);
   }, [selectedClassId, classFilter]);
 
   useEffect(() => {
     if (!selectedAssignmentId || selectedAssignmentId === assignmentFilter) return;
+    if (classAssignments.length && !classAssignments.some((item) => item.id === selectedAssignmentId)) return;
     setAssignmentFilter(selectedAssignmentId);
     setSelectedId(null);
     setDetail(null);
-  }, [selectedAssignmentId, assignmentFilter]);
+  }, [selectedAssignmentId, assignmentFilter, classAssignments]);
 
   useEffect(() => {
     if (selectedId) loadDetail(selectedId);
   }, [selectedId]);
 
-  async function handleSaveFeedback(payload: { feedback: string; reviewed: boolean; score: string; maxScore: string; gradingStatus: string }) {
+  async function handleSaveFeedback(payload: { feedback: string; score: string }) {
     if (!token || !selectedId) return;
     setIsSaving(true);
     setError("");
@@ -278,13 +318,12 @@ export function TeacherSubmissions({ classes, selectedClassId, selectedAssignmen
     try {
       const updated = await updateTeacherSubmissionReview(token, selectedId, {
         teacher_feedback: payload.feedback,
-        reviewed: payload.reviewed,
+        reviewed: true,
         score: payload.score ? Number.parseFloat(payload.score) : null,
-        max_score: payload.maxScore ? Number.parseFloat(payload.maxScore) : null,
-        grading_status: payload.gradingStatus,
+        grading_status: "RETURNED",
       });
       setDetail(updated);
-      setMessage("Đã lưu feedback.");
+      setMessage("Đã lưu.");
       await loadSubmissions();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Không lưu được feedback");
@@ -305,36 +344,41 @@ export function TeacherSubmissions({ classes, selectedClassId, selectedAssignmen
             <CheckCircle2 className="text-[#1d73e8]" size={22} />
           </div>
           <div className="space-y-2">
-            <div className="flex items-center gap-2 rounded-lg border border-[#d0d8e4] px-3 py-2">
-              <Search size={16} className="text-[#667085]" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                placeholder="Tìm học sinh, bài giao, email"
-              />
+            <div className="grid grid-cols-1 gap-2">
+              {isClassLocked ? (
+                <div className="rounded-lg border border-[#d0d8e4] bg-[#f8fafc] px-3 py-2 text-sm font-semibold text-[#344054]">
+                  {selectedClassName}
+                </div>
+              ) : (
+                <select value={classFilter} onChange={(event) => setClassFilter(event.target.value)} className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm">
+                  {!classes.length && <option value="ALL">Chưa có lớp</option>}
+                  {classes.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <select value={classFilter} onChange={(event) => setClassFilter(event.target.value)} className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm">
-                <option value="ALL">Tất cả lớp</option>
-                {classes.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
+              <select value={childFilter} onChange={(event) => setChildFilter(event.target.value)} className="min-w-0 rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm">
+                <option value="ALL">Học sinh</option>
+                {activeRoster.map((child) => (
+                  <option key={child.id} value={child.id}>
+                    {child.display_name} - {child.parent.full_name}
                   </option>
                 ))}
               </select>
               <select value={assignmentFilter} onChange={(event) => setAssignmentFilter(event.target.value)} className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm">
-                <option value="ALL">Mọi bài giao</option>
-                {items
-                  .filter((item, index, array) => array.findIndex((other) => other.assignment_id === item.assignment_id) === index)
-                  .map((item) => (
-                    <option key={item.assignment_id} value={item.assignment_id}>
-                      {item.assignment_title}
+                <option value="ALL">Bài giao</option>
+                {classAssignments.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.title}
                     </option>
                   ))}
               </select>
               <select value={gradingFilter} onChange={(event) => setGradingFilter(event.target.value)} className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm">
-                <option value="ALL">Mọi trạng thái chấm</option>
+                <option value="ALL">Trạng thái</option>
                 <option value="SUBMITTED">Chưa chấm</option>
                 <option value="GRADED">Đã chấm</option>
                 <option value="RETURNED">Đã trả bài</option>
@@ -350,14 +394,14 @@ export function TeacherSubmissions({ classes, selectedClassId, selectedAssignmen
                 <option value="false">Đúng hạn</option>
                 <option value="true">Nộp muộn</option>
               </select>
-              <input value={scoreMin} onChange={(event) => setScoreMin(event.target.value)} type="number" min="0" max="100" step="0.5" className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm" placeholder="Điểm từ" />
-              <input value={scoreMax} onChange={(event) => setScoreMax(event.target.value)} type="number" min="0" max="100" step="0.5" className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm" placeholder="Điểm đến" />
+              <input value={scoreMin} onChange={(event) => setScoreMin(event.target.value)} type="number" min="0" max={selectedAssignmentMaxScore} step="0.5" className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm" placeholder="Điểm từ" />
+              <input value={scoreMax} onChange={(event) => handleScoreMaxFilterChange(event.target.value)} type="number" min="0" max={selectedAssignmentMaxScore} step="0.5" className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm" placeholder={`Điểm đến (≤ ${selectedAssignmentMaxScore})`} />
             </div>
           </div>
         </div>
 
         <div className="space-y-2">
-          {filteredItems.map((item) => (
+          {items.map((item) => (
             <button
               key={item.id}
               onClick={() => setSelectedId(item.id)}
@@ -374,8 +418,7 @@ export function TeacherSubmissions({ classes, selectedClassId, selectedAssignmen
               </div>
               <div className="mt-3 flex flex-wrap gap-3 text-xs font-semibold text-[#667085]">
                 <span>{item.class_name}</span>
-                <span>{item.score != null ? `${item.score}/${item.max_score ?? 10}` : item.grading_status}</span>
-                <span>{item.reviewed_at ? "Đã review" : "Chưa review"}</span>
+                <span>{item.score != null ? `${item.score}/${item.max_score ?? 10}` : gradingStatusLabel(item.grading_status)}</span>
                 <span>{formatDate(item.created_at)}</span>
               </div>
               {item.review_reason && (
@@ -387,9 +430,9 @@ export function TeacherSubmissions({ classes, selectedClassId, selectedAssignmen
             </button>
           ))}
           {isLoading && <div className="rounded-xl bg-white p-5 text-sm text-[#667085]">Đang tải bài nộp...</div>}
-          {!isLoading && !filteredItems.length && (
+          {!isLoading && !items.length && (
             <div className="rounded-xl border border-[#dfe6ef] bg-white p-5 text-sm text-[#667085]">
-              Không có bài nộp phù hợp với bộ lọc.
+              Không có bài nộp phù hợp trong {selectedClassName}.
             </div>
           )}
         </div>

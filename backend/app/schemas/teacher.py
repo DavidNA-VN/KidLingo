@@ -64,6 +64,7 @@ class AssignmentMini(BaseModel):
     title: str
     status: str
     lesson_title: str
+    max_score: float
     due_at: datetime | None
     submission_count: int
 

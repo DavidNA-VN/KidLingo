@@ -61,6 +61,28 @@ function materialLabel(type: string) {
   return labels[type] ?? type;
 }
 
+function assignmentStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    PUBLISHED: "Đang mở",
+    CLOSED: "Đã đóng",
+  };
+  return labels[status] ?? status;
+}
+
+function getFriendlyJoinClassError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+
+  if (message === "CLASS_CODE_NOT_FOUND" || message.includes("404")) {
+    return "Mã lớp chưa đúng. Vui lòng kiểm tra lại mã giáo viên đã gửi.";
+  }
+
+  if (!message || message === "Request failed" || message.includes("Failed to fetch")) {
+    return "Chưa kết nối được máy chủ. Vui lòng thử lại sau.";
+  }
+
+  return "Chưa thể tham gia lớp. Vui lòng kiểm tra mã lớp và thử lại.";
+}
+
 function MaterialCard({ material }: { material: LessonMaterial }) {
   return (
     <div className="rounded-xl border border-[#e4eaf2] bg-white p-4">
@@ -119,10 +141,12 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
   const [editChildName, setEditChildName] = useState("");
   const [editBirthYear, setEditBirthYear] = useState("");
   const [classCode, setClassCode] = useState("SUNFLOWER-3");
+  const [classCodeError, setClassCodeError] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [answerFile, setAnswerFile] = useState<File | null>(null);
+  const isAssignmentClosed = assignmentDetail?.status === "CLOSED";
 
   const activeChildren = useMemo(() => children.filter((child) => child.status === "ACTIVE"), [children]);
   const selectedChild = useMemo(
@@ -176,6 +200,7 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
       return;
     }
     setMessage("");
+    setClassCodeError("");
     setSelectedAssignmentId(null);
     setAssignmentDetail(null);
     loadChildWorkspace(selectedChildId).catch((requestError) =>
@@ -232,15 +257,20 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
   }
 
   async function handleJoinClass() {
-    if (!token || !selectedChild || !classCode.trim()) return;
+    if (!token || !selectedChild) return;
     setError("");
+    setClassCodeError("");
     setMessage("");
+    if (!classCode.trim()) {
+      setClassCodeError("Vui lòng nhập mã lớp giáo viên đã gửi.");
+      return;
+    }
     try {
       const result = await joinClassByCode(token, selectedChild.id, classCode.trim());
       await Promise.all([loadChildren(), loadChildWorkspace(selectedChild.id)]);
       setMessage(result.already_joined ? "Bé đã ở trong lớp này, không tạo trùng." : `Đã tham gia lớp ${result.class_name}.`);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Không tham gia được lớp");
+      setClassCodeError(getFriendlyJoinClassError(requestError));
     }
   }
 
@@ -430,7 +460,25 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
                     <Link size={18} />
                     Nhập mã lớp
                   </h3>
-                  <input value={classCode} onChange={(event) => setClassCode(event.target.value.toUpperCase())} className="mt-4 w-full rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm font-semibold outline-none focus:border-[#12b76a]" placeholder="SUNFLOWER-3" />
+                  <input
+                    value={classCode}
+                    onChange={(event) => {
+                      setClassCode(event.target.value.toUpperCase());
+                      setClassCodeError("");
+                      setMessage("");
+                    }}
+                    aria-invalid={Boolean(classCodeError)}
+                    aria-describedby={classCodeError ? "class-code-error" : undefined}
+                    className={`mt-4 w-full rounded-lg border px-3 py-2 text-sm font-semibold outline-none focus:border-[#12b76a] ${
+                      classCodeError ? "border-[#f04438] bg-[#fff4f3]" : "border-[#d0d8e4]"
+                    }`}
+                    placeholder="SUNFLOWER-3"
+                  />
+                  {classCodeError && (
+                    <p id="class-code-error" className="mt-2 text-xs font-semibold text-[#b42318]">
+                      {classCodeError}
+                    </p>
+                  )}
                   <button onClick={handleJoinClass} className="mt-3 w-full rounded-lg bg-[#172033] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#26344d]">Tham gia lớp</button>
                 </div>
               </section>
@@ -442,7 +490,7 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
                       <BookOpen size={18} />
                       Bài được giao
                     </h3>
-                    <p className="mt-1 text-sm text-[#667085]">Chỉ hiển thị bài đã publish từ giáo viên.</p>
+                    <p className="mt-1 text-sm text-[#667085]">Chỉ hiển thị bài giáo viên đã phát hành.</p>
                   </div>
                   {assignments.map((assignment) => (
                     <button key={assignment.assignment_id} onClick={() => setSelectedAssignmentId(assignment.assignment_id)} className={`w-full rounded-xl border bg-white p-4 text-left shadow-sm transition ${selectedAssignmentId === assignment.assignment_id ? "border-[#12b76a] bg-[#ecfdf3]" : "border-[#e4eaf2] hover:bg-[#f8fafc]"}`}>
@@ -451,11 +499,12 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
                           <div className="truncate font-bold">{assignment.title}</div>
                           <div className="mt-1 text-sm text-[#667085]">{assignment.class_name}</div>
                         </div>
-                        {assignment.submitted ? <CheckCircle2 className="text-[#12b76a]" size={20} /> : <CalendarClock className="text-[#f79009]" size={20} />}
+                        {assignment.submitted ? <CheckCircle2 className="text-[#12b76a]" size={20} /> : <CalendarClock className={assignment.status === "CLOSED" ? "text-[#98a2b3]" : "text-[#f79009]"} size={20} />}
                       </div>
                       <div className="mt-3 flex flex-wrap gap-3 text-xs font-semibold text-[#667085]">
                         <span>Hạn {formatDate(assignment.due_at)}</span>
                         <span>{assignment.material_count} tài liệu</span>
+                        <span>{assignmentStatusLabel(assignment.status)}</span>
                         <span>{assignment.submitted ? "Đã nộp" : "Chưa nộp"}</span>
                       </div>
                     </button>
@@ -473,7 +522,7 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
                             <p className="mt-1 text-sm text-[#667085]">{assignmentDetail.lesson_title} · {assignmentDetail.teacher_name}</p>
                             <p className="mt-3 rounded-lg bg-[#f8fafc] p-3 text-sm leading-6 text-[#344054]">{assignmentDetail.instructions ?? "Giáo viên chưa thêm hướng dẫn."}</p>
                           </div>
-                          <button onClick={() => setLearningAssignment(assignmentDetail)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#12b76a] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0f9f5f]">
+                          <button onClick={() => setLearningAssignment(assignmentDetail)} disabled={isAssignmentClosed} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#12b76a] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0f9f5f] disabled:cursor-not-allowed disabled:bg-[#98a2b3]">
                             <PlayCircle size={17} />
                             Bắt đầu học
                           </button>
@@ -498,6 +547,7 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
                         </div>
                         <div className="mt-4 rounded-lg bg-[#f8fafc] p-4 text-sm text-[#667085]">
                           Trạng thái: <span className="font-bold text-[#344054]">{assignmentDetail.latest_grading_status ?? (assignmentDetail.submitted ? "Đã nộp" : "Chưa nộp")}</span>
+                          <span className="ml-3 font-bold text-[#344054]">{assignmentStatusLabel(assignmentDetail.status)}</span>
                           {assignmentDetail.latest_score != null && (
                             <span className="ml-3 font-bold text-[#067647]">
                               Điểm {assignmentDetail.latest_score}/{assignmentDetail.latest_max_score ?? assignmentDetail.max_score}
@@ -505,16 +555,22 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
                           )}
                           {assignmentDetail.latest_feedback && <div className="mt-2 text-[#344054]">{assignmentDetail.latest_feedback}</div>}
                         </div>
-                        <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
-                          <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[#b8c4d6] px-3 py-3 text-sm font-semibold text-[#344054]">
-                            <FileText size={16} />
-                            <span className="min-w-0 flex-1 truncate">{answerFile?.name ?? "Chọn file trả lời (.doc, .docx, .pdf)"}</span>
-                            <input type="file" accept=".doc,.docx,.pdf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={(event) => setAnswerFile(event.target.files?.[0] ?? null)} />
-                          </label>
-                          <button onClick={handleUploadAnswerFile} disabled={!answerFile} className="rounded-lg bg-[#12b76a] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0f9f5f] disabled:opacity-50">
-                            Nộp bài
-                          </button>
-                        </div>
+                        {isAssignmentClosed ? (
+                          <div className="mt-4 rounded-lg bg-[#f2f4f7] p-4 text-sm font-semibold text-[#667085]">
+                            Bài giao đã đóng, phụ huynh không thể nộp thêm.
+                          </div>
+                        ) : (
+                          <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
+                            <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[#b8c4d6] px-3 py-3 text-sm font-semibold text-[#344054]">
+                              <FileText size={16} />
+                              <span className="min-w-0 flex-1 truncate">{answerFile?.name ?? "Chọn file trả lời (.doc, .docx, .pdf)"}</span>
+                              <input type="file" accept=".doc,.docx,.pdf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={(event) => setAnswerFile(event.target.files?.[0] ?? null)} />
+                            </label>
+                            <button onClick={handleUploadAnswerFile} disabled={!answerFile} className="rounded-lg bg-[#12b76a] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0f9f5f] disabled:opacity-50">
+                              Nộp bài
+                            </button>
+                          </div>
+                        )}
                       </section>
 
                       <section className="rounded-xl border border-[#dfe6ef] bg-white p-5 shadow-sm">

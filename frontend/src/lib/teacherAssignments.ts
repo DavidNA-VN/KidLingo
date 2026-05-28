@@ -18,7 +18,7 @@ export type TeacherAssignmentListItem = {
   worksheet_file_url: string | null;
   answer_template_url: string | null;
   max_score: number;
-  status: "DRAFT" | "PUBLISHED" | "CLOSED";
+  status: "PUBLISHED" | "CLOSED";
   due_at: string | null;
   class_id: string;
   class_name: string;
@@ -62,7 +62,7 @@ export type TeacherAssignmentUpdatePayload = {
   answer_template_url?: string | null;
   max_score?: number;
   due_at?: string | null;
-  status?: "DRAFT" | "PUBLISHED" | "CLOSED";
+  status?: "PUBLISHED" | "CLOSED";
 };
 
 export type CreateTeacherAssignmentPayload = {
@@ -73,7 +73,7 @@ export type CreateTeacherAssignmentPayload = {
   assignment_type?: string;
   max_score?: number;
   due_at?: string | null;
-  status: "DRAFT" | "PUBLISHED" | "CLOSED";
+  status?: "PUBLISHED" | "CLOSED";
 };
 
 export function listTeacherAssignments(

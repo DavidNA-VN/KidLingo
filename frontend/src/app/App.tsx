@@ -39,6 +39,20 @@ export default function App() {
     "https://babilala.vn/wp-content/uploads/2023/02/ung-dung-hoc-tieng-anh-bang-hinh-anh-750x500.jpeg",
   ];
 
+  function getFriendlyLoginError(error: unknown) {
+    const message = error instanceof Error ? error.message : "";
+
+    if (!message || message === "Request failed" || message.includes("Failed to fetch")) {
+      return "Chưa kết nối được máy chủ. Vui lòng thử lại sau.";
+    }
+
+    if (message === "INVALID_CREDENTIALS" || message.includes("401")) {
+      return "Email hoặc mật khẩu chưa đúng. Vui lòng kiểm tra lại.";
+    }
+
+    return "Đăng nhập chưa thành công. Vui lòng kiểm tra lại thông tin và thử lại.";
+  }
+
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -60,6 +74,10 @@ export default function App() {
 
   async function handleLogin() {
     setLoginError('');
+    if (!loginEmail.trim() || !loginPassword) {
+      setLoginError('Vui lòng nhập email và mật khẩu.');
+      return;
+    }
     setIsLoggingIn(true);
     try {
       const session = await login(loginEmail, loginPassword);
@@ -67,7 +85,7 @@ export default function App() {
       setCurrentUser(session.user);
       setShowLoginModal(false);
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : 'Đăng nhập thất bại');
+      setLoginError(getFriendlyLoginError(error));
     } finally {
       setIsLoggingIn(false);
     }
@@ -311,7 +329,10 @@ export default function App() {
                 type="email"
                 placeholder="Email"
                 value={loginEmail}
-                onChange={(event) => setLoginEmail(event.target.value)}
+                onChange={(event) => {
+                  setLoginEmail(event.target.value);
+                  setLoginError('');
+                }}
                 className="w-full px-4 py-3 bg-[#f5f6f8] border-2 border-transparent rounded-xl text-base focus:outline-none focus:border-[#2b8cff] focus:bg-white transition-all"
               />
 
@@ -319,7 +340,10 @@ export default function App() {
                 type="password"
                 placeholder="Mật khẩu"
                 value={loginPassword}
-                onChange={(event) => setLoginPassword(event.target.value)}
+                onChange={(event) => {
+                  setLoginPassword(event.target.value);
+                  setLoginError('');
+                }}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
                     handleLogin();

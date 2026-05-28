@@ -35,6 +35,7 @@ export type AssignmentMini = {
   title: string;
   status: string;
   lesson_title: string;
+  max_score: number;
   due_at: string | null;
   submission_count: number;
 };

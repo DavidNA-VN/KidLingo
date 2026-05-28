@@ -2,7 +2,6 @@ import {
   Archive,
   BookOpen,
   CheckCircle2,
-  ChevronRight,
   CircleAlert,
   Coins,
   Copy,
@@ -11,7 +10,6 @@ import {
   LogOut,
   MessageSquareText,
   Plus,
-  Search,
   Sparkles,
   Star,
   UsersRound,
@@ -26,14 +24,10 @@ import { TeacherSubmissions } from "./TeacherSubmissions";
 import type { AuthUser } from "../lib/auth";
 import { getStoredToken } from "../lib/auth";
 import {
-  addChildToClass,
   createTeacherClass,
   getTeacherClassDetail,
   listTeacherClasses,
-  searchChildren,
-  updateTeacherClass,
   updateChildMembership,
-  type ChildSearchResult,
   type TeacherClassDetail,
   type TeacherClassSummary,
 } from "../lib/teacher";
@@ -84,16 +78,11 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
   const [classes, setClasses] = useState<TeacherClassSummary[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [classDetail, setClassDetail] = useState<TeacherClassDetail | null>(null);
-  const [searchQuery, setSearchQuery] = useState("Ben");
-  const [searchResults, setSearchResults] = useState<ChildSearchResult[]>([]);
   const [newClassName, setNewClassName] = useState("");
   const [newClassDescription, setNewClassDescription] = useState("");
-  const [editClassName, setEditClassName] = useState("");
-  const [editClassDescription, setEditClassDescription] = useState("");
   const [activeSection, setActiveSection] = useState("Tổng quan");
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [copiedClassCode, setCopiedClassCode] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -131,10 +120,8 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
 
   useEffect(() => {
     if (!token) return;
-    setIsLoading(true);
     loadClasses(true)
       .catch((requestError) => setError(requestError instanceof Error ? requestError.message : "Cannot load classes"))
-      .finally(() => setIsLoading(false));
   }, [token]);
 
   useEffect(() => {
@@ -146,12 +133,6 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
       setClassDetail(null);
     }
   }, [selectedClassId]);
-
-  useEffect(() => {
-    if (!classDetail) return;
-    setEditClassName(classDetail.name);
-    setEditClassDescription(classDetail.description ?? "");
-  }, [classDetail?.id]);
 
   async function handleCreateClass() {
     if (!token || !newClassName.trim()) return;
@@ -168,37 +149,6 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Cannot create class");
     }
-  }
-
-  async function handleUpdateClass() {
-    if (!token || !selectedClassId || !editClassName.trim()) return;
-    setError("");
-    try {
-      await updateTeacherClass(token, selectedClassId, {
-        name: editClassName,
-        description: editClassDescription || undefined,
-      });
-      await Promise.all([loadClasses(), loadClassDetail(selectedClassId)]);
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Cannot update class");
-    }
-  }
-
-  async function handleSearchChildren() {
-    if (!token || searchQuery.trim().length < 1) return;
-    setError("");
-    try {
-      const result = await searchChildren(token, searchQuery);
-      setSearchResults(result.items);
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Cannot search children");
-    }
-  }
-
-  async function handleAddChild(childId: string) {
-    if (!token || !selectedClassId) return;
-    await addChildToClass(token, selectedClassId, childId);
-    await Promise.all([loadClasses(), loadClassDetail(selectedClassId)]);
   }
 
   async function handleArchiveChild(childId: string) {
@@ -223,7 +173,16 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
   }
 
   const selectedClass = classes.find((item) => item.id === selectedClassId) ?? null;
-  const showClassContext = !["Tổng quan", "Lớp học"].includes(activeSection);
+  const scopedTotals = selectedClass
+    ? {
+        classes: 1,
+        children: selectedClass.active_child_count,
+        assignments: selectedClass.assignment_count,
+        submissions: selectedClass.submission_count,
+      }
+    : totals;
+  const displayTotals = scopedTotals;
+  const showClassContext = true;
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f4f7fb] text-[#172033]">
@@ -291,10 +250,10 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
 
           <section className="grid gap-4 md:grid-cols-4">
             {[
-              ["Lớp học", totals.classes, UsersRound],
-              ["Học sinh đang học", totals.children, GraduationCap],
-              ["Bài giao", totals.assignments, BookOpen],
-              ["Bài nộp", totals.submissions, CheckCircle2],
+              ["Lớp học", displayTotals.classes, UsersRound],
+              ["Học sinh đang học", displayTotals.children, GraduationCap],
+              ["Bài giao", displayTotals.assignments, BookOpen],
+              ["Bài nộp", displayTotals.submissions, CheckCircle2],
             ].map(([label, value, Icon]) => (
               <div key={label as string} className="rounded-xl border border-[#dfe6ef] bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between">
@@ -331,7 +290,7 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
           )}
 
           {activeSection === "Tổng quan" ? (
-            <TeacherOverview onOpenSection={handleOpenSection} />
+            <TeacherOverview selectedClassId={selectedClassId} selectedClassName={selectedClass?.name} onOpenSection={handleOpenSection} />
           ) : activeSection === "Bài học" ? (
             <LessonStudio classes={classes} selectedClassId={selectedClassId} />
           ) : activeSection === "Bài giao" ? (
@@ -344,50 +303,8 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
           <section className="grid min-w-0 gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
             <div className="space-y-4">
               <div className="rounded-xl border border-[#dfe6ef] bg-white p-5 shadow-sm">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-bold">Lớp học</h2>
-                    <p className="text-sm text-[#667085]">Quản lý danh sách lớp và hoạt động học tập.</p>
-                  </div>
-                  <UsersRound className="text-[#1d73e8]" size={22} />
-                </div>
-
-                <div className="space-y-2">
-                  {isLoading ? (
-                    <div className="rounded-lg bg-[#f6f8fb] p-4 text-sm text-[#667085]">Đang tải lớp học...</div>
-                  ) : (
-                    classes.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => setSelectedClassId(item.id)}
-                        className={`w-full rounded-lg border p-4 text-left transition ${
-                          selectedClassId === item.id
-                            ? "border-[#1d73e8] bg-[#f2f7ff]"
-                            : "border-[#e4eaf2] bg-white hover:bg-[#f8fafc]"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="font-bold text-[#172033]">{item.name}</div>
-                            <div className="mt-1 text-xs font-semibold text-[#667085]">
-                              {item.class_code ?? "Chưa có mã lớp"}
-                            </div>
-                          </div>
-                          <ChevronRight size={18} className="text-[#98a2b3]" />
-                        </div>
-                        <div className="mt-3 flex gap-3 text-xs text-[#667085]">
-                          <span>{item.active_child_count} đang học</span>
-                          <span>{item.assignment_count} bài giao</span>
-                          <span>{item.submission_count} bài nộp</span>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-[#dfe6ef] bg-white p-5 shadow-sm">
                 <h3 className="font-bold">Tạo lớp mới</h3>
+                <p className="mt-1 text-sm text-[#667085]">Tạo lớp xong hệ thống sẽ tự chuyển ngữ cảnh sang lớp mới.</p>
                 <div className="mt-4 space-y-3">
                   <input
                     value={newClassName}
@@ -459,7 +376,7 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
                     </div>
                   </div>
 
-                  <div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_340px]">
+                  <div className="grid min-w-0 gap-4">
                     <section className="min-w-0 rounded-xl border border-[#dfe6ef] bg-white shadow-sm">
                       <div className="border-b border-[#edf1f5] px-5 py-4">
                         <h3 className="font-bold">Danh sách học sinh</h3>
@@ -521,72 +438,7 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
                       </div>
                     </section>
 
-                    <section className="rounded-xl border border-[#dfe6ef] bg-white p-5 shadow-sm">
-                      <h3 className="font-bold">Thêm học sinh</h3>
-                      <div className="mt-3 flex gap-2">
-                        <input
-                          value={searchQuery}
-                          onChange={(event) => setSearchQuery(event.target.value)}
-                          className="min-w-0 flex-1 rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]"
-                          placeholder="Tên trẻ hoặc email phụ huynh"
-                        />
-                        <button
-                          onClick={handleSearchChildren}
-                          className="inline-flex items-center justify-center rounded-lg bg-[#172033] px-3 text-white"
-                        >
-                          <Search size={16} />
-                        </button>
-                      </div>
-                      <div className="mt-4 space-y-2">
-                        {searchResults.map((child) => (
-                          <div key={child.id} className="rounded-lg border border-[#e4eaf2] p-3">
-                            <div className="font-bold">{child.display_name}</div>
-                            <div className="mt-1 text-xs text-[#667085]">{child.parent.email}</div>
-                            <button
-                              onClick={() => handleAddChild(child.id)}
-                              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#1d73e8] px-3 py-2 text-xs font-bold text-white hover:bg-[#155dcc]"
-                            >
-                              <Plus size={14} />
-                              Thêm vào lớp
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
                   </div>
-
-                  <section className="rounded-xl border border-[#dfe6ef] bg-white p-5 shadow-sm">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-                      <div className="grid flex-1 gap-3">
-                        <label className="block">
-                          <span className="text-xs font-bold uppercase tracking-wide text-[#667085]">
-                            Tên lớp
-                          </span>
-                          <input
-                            value={editClassName}
-                            onChange={(event) => setEditClassName(event.target.value)}
-                            className="mt-1 w-full rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]"
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="text-xs font-bold uppercase tracking-wide text-[#667085]">
-                            Mô tả
-                          </span>
-                          <input
-                            value={editClassDescription}
-                            onChange={(event) => setEditClassDescription(event.target.value)}
-                            className="mt-1 w-full rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]"
-                          />
-                        </label>
-                      </div>
-                      <button
-                        onClick={handleUpdateClass}
-                        className="rounded-lg border border-[#1d73e8] px-4 py-2.5 text-sm font-bold text-[#155dcc] transition hover:bg-[#f2f7ff]"
-                      >
-                        Lưu lớp
-                      </button>
-                    </div>
-                  </section>
 
                   <div className="grid gap-4 xl:grid-cols-2">
                     <section className="rounded-xl border border-[#dfe6ef] bg-white p-5 shadow-sm">

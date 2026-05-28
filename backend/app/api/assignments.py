@@ -18,7 +18,7 @@ from app.schemas.lesson import LessonMaterialPublic
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
 
-VALID_STATUSES = {"DRAFT", "PUBLISHED", "CLOSED"}
+VALID_STATUSES = {"PUBLISHED", "CLOSED"}
 VALID_ASSIGNMENT_TYPES = {"PDF_ASSIGNMENT"}
 
 

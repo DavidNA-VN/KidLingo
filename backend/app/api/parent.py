@@ -29,6 +29,7 @@ from app.schemas.parent import (
     ParentSubmissionHistoryItem,
 )
 from app.services.submission_types import GRADED_STATUSES, PDF_ANSWER
+from app.services.assignment_status_service import close_overdue_assignments
 from app.services.parent_assignment_service import (
     get_child_assignment_detail,
     get_parent_child,
@@ -202,14 +203,17 @@ def upload_assignment_submission_file(
     child = get_parent_child(db, current_user.id, child_id)
     if not child or child.status != "ACTIVE":
         raise HTTPException(status_code=404, detail="CHILD_NOT_FOUND")
+    close_overdue_assignments(db, assignment_ids=[assignment_id])
     row = db.execute(
         select(Assignment, Class)
         .join(Class, Class.id == Assignment.class_id)
-        .where(Assignment.id == assignment_id, Assignment.status == "PUBLISHED")
+        .where(Assignment.id == assignment_id, Assignment.status.in_(["PUBLISHED", "CLOSED"]))
     ).first()
     if not row:
         raise HTTPException(status_code=404, detail="ASSIGNMENT_NOT_FOUND")
     assignment, classroom = row
+    if assignment.status == "CLOSED":
+        raise HTTPException(status_code=409, detail="ASSIGNMENT_CLOSED")
     membership = db.execute(
         select(Child)
         .join(ClassChild, ClassChild.child_id == Child.id)

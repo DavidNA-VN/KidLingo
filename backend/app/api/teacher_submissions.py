@@ -41,24 +41,27 @@ def get_submissions(
     date_from: datetime | None = None,
     date_to: datetime | None = None,
 ) -> list[TeacherSubmissionListItem]:
-    return list_teacher_submissions(
-        db,
-        current_user.id,
-        class_id=class_id,
-        assignment_id=assignment_id,
-        child_id=child_id,
-        is_correct=is_correct,
-        speech_passed=speech_passed,
-        reviewed=reviewed,
-        grading_status=grading_status,
-        score_min=score_min,
-        score_max=score_max,
-        late=late,
-        confidence_min=confidence_min,
-        confidence_max=confidence_max,
-        date_from=date_from,
-        date_to=date_to,
-    )
+    try:
+        return list_teacher_submissions(
+            db,
+            current_user.id,
+            class_id=class_id,
+            assignment_id=assignment_id,
+            child_id=child_id,
+            is_correct=is_correct,
+            speech_passed=speech_passed,
+            reviewed=reviewed,
+            grading_status=grading_status,
+            score_min=score_min,
+            score_max=score_max,
+            late=late,
+            confidence_min=confidence_min,
+            confidence_max=confidence_max,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/classes/{class_id}/submissions", response_model=list[TeacherSubmissionListItem])

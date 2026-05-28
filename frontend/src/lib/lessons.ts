@@ -46,7 +46,7 @@ export type AssignmentSummary = {
   answer_template_url: string | null;
   max_score: number;
   due_at: string | null;
-  status: "DRAFT" | "PUBLISHED" | "CLOSED";
+  status: "PUBLISHED" | "CLOSED";
   class_name: string;
   lesson_title: string;
   material_count: number;

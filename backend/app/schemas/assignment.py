@@ -16,7 +16,7 @@ class AssignmentCreate(BaseModel):
     answer_template_url: str | None = Field(default=None, max_length=2000)
     max_score: float = Field(default=10.0, gt=0, le=100)
     due_at: datetime | None = None
-    status: str = "DRAFT"
+    status: str = "PUBLISHED"
 
 
 class AssignmentUpdate(BaseModel):

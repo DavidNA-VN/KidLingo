@@ -27,7 +27,7 @@ class Assignment(Base):
     answer_template_url: Mapped[str | None] = mapped_column(Text)
     max_score: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False, default=10.00)
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="PUBLISHED")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

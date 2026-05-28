@@ -28,11 +28,12 @@ import { getStoredToken } from "../lib/auth";
 import { getTeacherDashboard, type TeacherDashboardData } from "../lib/dashboard";
 
 type TeacherOverviewProps = {
+  selectedClassId: string | null;
+  selectedClassName?: string | null;
   onOpenSection?: (section: string, classId?: string) => void;
 };
 
 const statusLabels: Record<string, string> = {
-  DRAFT: "Bản nháp",
   PUBLISHED: "Đã giao",
   CLOSED: "Đã đóng",
 };
@@ -77,22 +78,23 @@ function SummaryCard({
   );
 }
 
-export function TeacherOverview({ onOpenSection }: TeacherOverviewProps) {
+export function TeacherOverview({ selectedClassId, selectedClassName, onOpenSection }: TeacherOverviewProps) {
   const token = getStoredToken();
   const [data, setData] = useState<TeacherDashboardData | null>(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !selectedClassId) return;
     setIsLoading(true);
-    getTeacherDashboard(token)
+    setError("");
+    getTeacherDashboard(token, selectedClassId)
       .then(setData)
       .catch((requestError) =>
         setError(requestError instanceof Error ? requestError.message : "Không tải được dashboard"),
       )
       .finally(() => setIsLoading(false));
-  }, [token]);
+  }, [token, selectedClassId]);
 
   const classChartData = useMemo(
     () =>
@@ -109,6 +111,14 @@ export function TeacherOverview({ onOpenSection }: TeacherOverviewProps) {
     () => data?.status_breakdown.map((item) => ({ name: statusLabels[item.status], value: item.count })) ?? [],
     [data],
   );
+
+  if (!selectedClassId) {
+    return (
+      <div className="rounded-xl border border-[#dfe6ef] bg-white p-8 text-center text-[#667085]">
+        Chọn lớp để xem thống kê dashboard.
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -135,7 +145,7 @@ export function TeacherOverview({ onOpenSection }: TeacherOverviewProps) {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Lớp đang quản lý" value={data.summary.class_count} helper="Tổng số lớp của giáo viên" icon={UsersRound} />
+        <SummaryCard label="Lớp đang xem" value={selectedClassName ?? data.class_progress[0]?.class_name ?? "Lớp"} helper="Dashboard đang lọc theo lớp đã chọn" icon={UsersRound} />
         <SummaryCard label="Học sinh active" value={data.summary.active_child_count} helper="Tính theo roster đang học" icon={BookOpenCheck} />
         <SummaryCard label="Bài đang mở" value={data.summary.open_assignment_count} helper="Bài tập đã giao" icon={ClipboardList} />
         <SummaryCard

@@ -44,6 +44,7 @@ export type TeacherSubmissionDetail = TeacherSubmissionListItem & {
 export type SubmissionFilters = {
   class_id?: string;
   assignment_id?: string;
+  child_id?: string;
   grading_status?: string;
   score_min?: string;
   score_max?: string;

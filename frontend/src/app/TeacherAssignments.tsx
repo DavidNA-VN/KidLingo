@@ -7,7 +7,6 @@ import {
   ListFilter,
   Plus,
   Save,
-  Search,
   Upload,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -33,11 +32,9 @@ type TeacherAssignmentsProps = {
   onOpenSubmissions?: (section: string, classId?: string, assignmentId?: string) => void;
 };
 
-type AssignmentStatus = "DRAFT" | "PUBLISHED" | "CLOSED";
+type AssignmentStatus = "PUBLISHED" | "CLOSED";
 
 const statusLabels = {
-  ALL: "Tất cả",
-  DRAFT: "Bản nháp",
   PUBLISHED: "Đã giao",
   CLOSED: "Đã đóng",
 };
@@ -75,9 +72,7 @@ function StatusBadge({ status }: { status: string }) {
   const color =
     status === "PUBLISHED"
       ? "bg-[#e8f7ef] text-[#067647]"
-      : status === "DRAFT"
-        ? "bg-[#eaf3ff] text-[#155dcc]"
-        : "bg-[#f2f4f7] text-[#667085]";
+      : "bg-[#f2f4f7] text-[#667085]";
   return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${color}`}>{statusLabels[status as keyof typeof statusLabels] ?? status}</span>;
 }
 
@@ -128,13 +123,12 @@ function AssignmentDetailPanel({
   isSaving,
 }: {
   detail: TeacherAssignmentDetail;
-  onSave: (payload: { title: string; instructions: string; due_at: string | null; status: AssignmentStatus; max_score?: number }) => Promise<void>;
+  onSave: (payload: { title: string; instructions: string; due_at: string | null; max_score?: number }) => Promise<void>;
   onOpenSubmissions?: (section: string, classId?: string, assignmentId?: string) => void;
   isSaving: boolean;
 }) {
   const [title, setTitle] = useState(detail.title);
   const [instructions, setInstructions] = useState(detail.instructions ?? "");
-  const [status, setStatus] = useState<AssignmentStatus>(detail.status);
   const [dueDate, setDueDate] = useState(splitDateTime(detail.due_at).date);
   const [dueTime, setDueTime] = useState(splitDateTime(detail.due_at).time);
   const [maxScore, setMaxScore] = useState(String(detail.max_score ?? 10));
@@ -143,7 +137,6 @@ function AssignmentDetailPanel({
     const due = splitDateTime(detail.due_at);
     setTitle(detail.title);
     setInstructions(detail.instructions ?? "");
-    setStatus(detail.status);
     setDueDate(due.date);
     setDueTime(due.time);
     setMaxScore(String(detail.max_score ?? 10));
@@ -189,24 +182,13 @@ function AssignmentDetailPanel({
           Chỉnh bài giao
         </h3>
         <div className="mt-4 space-y-5">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_150px_150px]">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_150px]">
             <FieldLabel label="Tên bài giao">
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 className="w-full rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]"
               />
-            </FieldLabel>
-            <FieldLabel label="Trạng thái">
-              <select
-                value={status}
-                onChange={(event) => setStatus(event.target.value as AssignmentStatus)}
-                className="w-full rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm font-semibold outline-none focus:border-[#1d73e8]"
-              >
-                <option value="DRAFT">Bản nháp</option>
-                <option value="PUBLISHED">Đã giao</option>
-                <option value="CLOSED">Đã đóng</option>
-              </select>
             </FieldLabel>
             <FieldLabel label="Điểm tối đa" help="Từ 1 đến 100, hỗ trợ bước 0.5 điểm.">
               <input
@@ -255,7 +237,6 @@ function AssignmentDetailPanel({
                 title,
                 instructions,
                 due_at: combineDateTime(dueDate, dueTime),
-                status,
                 max_score: Number.parseFloat(maxScore) || 10,
               })
             }
@@ -361,9 +342,8 @@ export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions
   const [lessons, setLessons] = useState<LessonSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<TeacherAssignmentDetail | null>(null);
-  const [statusFilter, setStatusFilter] = useState("ALL");
   const [classFilter, setClassFilter] = useState(selectedClassId ?? classes[0]?.id ?? "");
-  const [search, setSearch] = useState("");
+  const [lessonFilter, setLessonFilter] = useState("ALL");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -371,7 +351,6 @@ export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions
   const [newLessonId, setNewLessonId] = useState("");
   const [newTitle, setNewTitle] = useState("Bài tập PDF mới");
   const [newInstructions, setNewInstructions] = useState("");
-  const [newStatus, setNewStatus] = useState<AssignmentStatus>("DRAFT");
   const [newDueDate, setNewDueDate] = useState("");
   const [newDueTime, setNewDueTime] = useState("23:59");
   const [newMaxScore, setNewMaxScore] = useState("10");
@@ -379,15 +358,11 @@ export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions
   const [answerTemplateFile, setAnswerTemplateFile] = useState<File | null>(null);
 
   const filteredItems = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return items;
-    return items.filter(
-      (item) =>
-        item.title.toLowerCase().includes(query) ||
-        item.class_name.toLowerCase().includes(query) ||
-        item.lesson_title.toLowerCase().includes(query),
-    );
-  }, [items, search]);
+    if (lessonFilter === "ALL") return items;
+    return items.filter((item) => item.lesson_id === lessonFilter);
+  }, [items, lessonFilter]);
+  const selectedClassName = classes.find((item) => item.id === classFilter)?.name ?? "Lớp đã chọn";
+  const isClassLocked = Boolean(selectedClassId);
 
   async function loadAssignments(selectFirst = false) {
     if (!token) return;
@@ -395,7 +370,6 @@ export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions
     setError("");
     try {
       const result = await listTeacherAssignments(token, {
-        status: statusFilter,
         class_id: classFilter,
       });
       setItems(result);
@@ -421,7 +395,7 @@ export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions
 
   useEffect(() => {
     loadAssignments(true);
-  }, [token, statusFilter, classFilter]);
+  }, [token, classFilter]);
 
   useEffect(() => {
     if (!token || !classFilter) {
@@ -433,6 +407,7 @@ export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions
       .then((items) => {
         setLessons(items);
         setNewLessonId((current) => (current && items.some((item) => item.id === current) ? current : items[0]?.id ?? ""));
+        setLessonFilter((current) => (current === "ALL" || items.some((item) => item.id === current) ? current : "ALL"));
       })
       .catch((requestError) => setError(requestError instanceof Error ? requestError.message : "Không tải được bài học"));
   }, [token, classFilter]);
@@ -440,9 +415,17 @@ export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions
   useEffect(() => {
     if (!selectedClassId || selectedClassId === classFilter) return;
     setClassFilter(selectedClassId);
+    setLessonFilter("ALL");
     setSelectedId(null);
     setDetail(null);
   }, [selectedClassId, classFilter]);
+
+  useEffect(() => {
+    const nextId = filteredItems[0]?.assignment_id ?? null;
+    if (selectedId && filteredItems.some((item) => item.assignment_id === selectedId)) return;
+    setSelectedId(nextId);
+    if (!nextId) setDetail(null);
+  }, [lessonFilter, filteredItems, selectedId]);
 
   useEffect(() => {
     if (selectedId) loadDetail(selectedId);
@@ -462,7 +445,7 @@ export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions
         assignment_type: "PDF_ASSIGNMENT",
         max_score: Number.parseFloat(newMaxScore) || 10,
         due_at: combineDateTime(newDueDate, newDueTime),
-        status: newStatus,
+        status: "PUBLISHED",
       });
       let detailResult: TeacherAssignmentDetail | null = null;
       if (worksheetFile) {
@@ -484,7 +467,7 @@ export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions
     }
   }
 
-  async function handleSave(payload: { title: string; instructions: string; due_at: string | null; status: AssignmentStatus; max_score?: number }) {
+  async function handleSave(payload: { title: string; instructions: string; due_at: string | null; max_score?: number }) {
     if (!token || !selectedId) return;
     setIsSaving(true);
     setError("");
@@ -514,41 +497,45 @@ export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions
           </div>
 
           <div className="grid gap-2">
-            <div className="flex items-center gap-2 rounded-lg border border-[#d0d8e4] px-3 py-2">
-              <Search size={16} className="text-[#667085]" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                placeholder="Tìm bài, lớp, lesson"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none"
-              >
-                <option value="ALL">Tất cả trạng thái</option>
-                <option value="DRAFT">Bản nháp</option>
-                <option value="PUBLISHED">Đã giao</option>
-                <option value="CLOSED">Đã đóng</option>
-              </select>
-              <select
-                value={classFilter}
-                onChange={(event) => {
-                  setClassFilter(event.target.value);
-                  setSelectedId(null);
-                  setDetail(null);
-                }}
-                className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none"
-              >
-                {classes.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
+            <select
+              value={lessonFilter}
+              onChange={(event) => {
+                setLessonFilter(event.target.value);
+                setSelectedId(null);
+                setDetail(null);
+              }}
+              className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none"
+            >
+              <option value="ALL">Tất cả bài học</option>
+              {lessons.map((lesson) => (
+                <option key={lesson.id} value={lesson.id}>
+                  {lesson.title}
+                </option>
+              ))}
+            </select>
+            <div className="grid grid-cols-1 gap-2">
+              {isClassLocked ? (
+                <div className="rounded-lg border border-[#d0d8e4] bg-[#f8fafc] px-3 py-2 text-sm font-semibold text-[#344054]">
+                  {selectedClassName}
+                </div>
+              ) : (
+                <select
+                  value={classFilter}
+                  onChange={(event) => {
+                    setClassFilter(event.target.value);
+                    setLessonFilter("ALL");
+                    setSelectedId(null);
+                    setDetail(null);
+                  }}
+                  className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none"
+                >
+                  {classes.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
         </div>
@@ -635,7 +622,7 @@ export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions
                     />
                   </FieldLabel>
                 </div>
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3">
                   <FieldLabel label="Điểm tối đa" help="Từ 1 đến 100, hỗ trợ bước 0.5 điểm.">
                     <input
                       type="number"
@@ -646,17 +633,6 @@ export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions
                       onChange={(event) => setNewMaxScore(event.target.value)}
                       className="w-full rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]"
                     />
-                  </FieldLabel>
-                  <FieldLabel label="Trạng thái">
-                    <select
-                      value={newStatus}
-                      onChange={(event) => setNewStatus(event.target.value as AssignmentStatus)}
-                      className="w-full rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]"
-                    >
-                      <option value="DRAFT">Bản nháp</option>
-                      <option value="PUBLISHED">Đã giao</option>
-                      <option value="CLOSED">Đã đóng</option>
-                    </select>
                   </FieldLabel>
                 </div>
               </section>

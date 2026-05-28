@@ -48,7 +48,6 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<"CLASS_GROUP" | "DIRECT">("CLASS_GROUP");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState(classContextId ?? classes[0]?.id ?? "");
   const [roster, setRoster] = useState<RosterChild[]>([]);
   const [groupMembers, setGroupMembers] = useState<ClassGroupMember[]>([]);
   const [selectedChildId, setSelectedChildId] = useState("");
@@ -59,6 +58,11 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
   const [isLoading, setIsLoading] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const selectedClassId = classContextId ?? classes[0]?.id ?? "";
+  const selectedClass = useMemo(
+    () => classes.find((item) => item.id === selectedClassId) ?? null,
+    [classes, selectedClassId],
+  );
 
   const selectedConversation = useMemo(
     () => conversations.find((item) => item.id === selectedId) ?? null,
@@ -77,6 +81,7 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
     () => roster.find((child) => child.id === selectedChildId) ?? null,
     [roster, selectedChildId],
   );
+  const hasActiveStudents = roster.length > 0;
 
   async function loadConversations(selectFirst = false) {
     if (!token) return;
@@ -84,7 +89,12 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
     const result = await listConversations(token);
     setConversations(result);
     if (selectFirst || !selectedId || !result.some((item) => item.id === selectedId)) {
-      const next = result.find((conversation) => conversation.conversation_type === mode) ?? result[0] ?? null;
+      const next =
+        result.find(
+          (conversation) =>
+            conversation.conversation_type === mode &&
+            (!selectedClassId || conversation.class_id === selectedClassId || conversation.class_id === null),
+        ) ?? null;
       setSelectedId(next?.id ?? null);
     }
   }
@@ -96,16 +106,6 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
     setRoster(activeRoster);
     setSelectedChildId(activeRoster[0]?.id ?? "");
   }
-
-  useEffect(() => {
-    if (classContextId && classContextId !== selectedClassId) {
-      setSelectedClassId(classContextId);
-      return;
-    }
-    if (!selectedClassId && classes[0]?.id) {
-      setSelectedClassId(classes[0].id);
-    }
-  }, [classContextId, classes, selectedClassId]);
 
   useEffect(() => {
     if (!token) return;
@@ -121,6 +121,13 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
       setError(requestError instanceof Error ? requestError.message : "Không tải được danh sách học sinh"),
     );
   }, [selectedClassId, token]);
+
+  useEffect(() => {
+    const currentIsVisible = visibleConversations.some((conversation) => conversation.id === selectedId);
+    if (!currentIsVisible) {
+      setSelectedId(visibleConversations[0]?.id ?? null);
+    }
+  }, [selectedClassId, mode, selectedId, visibleConversations]);
 
   useEffect(() => {
     if (!selectedId || !token) {
@@ -158,7 +165,7 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
   }, [messages.length, selectedId]);
 
   async function handleCreateClassGroup() {
-    if (!token || !selectedClassId) return;
+    if (!token || !selectedClassId || !hasActiveStudents) return;
     setError("");
     setNotice("");
     try {
@@ -166,7 +173,7 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
         class_id: selectedClassId,
         context_message:
           contextMessage.trim() ||
-          `Thông báo chung cho phụ huynh lớp ${classes.find((item) => item.id === selectedClassId)?.name ?? ""}.`,
+          `Thông báo chung cho phụ huynh lớp ${selectedClass?.name ?? ""}.`,
       });
       await loadConversations();
       setMode("CLASS_GROUP");
@@ -190,7 +197,7 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
         context_message:
           contextMessage.trim() ||
           `Trao đổi về tình hình học tập của ${selectedChild.display_name} trong lớp ${
-            classes.find((item) => item.id === selectedClassId)?.name ?? ""
+            selectedClass?.name ?? ""
           }.`,
       });
       await loadConversations();
@@ -229,33 +236,34 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold">Trao đổi phụ huynh</h2>
-              <p className="text-sm text-[#667085]">Chọn lớp để mở nhóm lớp hoặc hội thoại riêng theo học sinh.</p>
+              <p className="text-sm text-[#667085]">Lớp lấy theo ngữ cảnh lớp ở đầu trang.</p>
             </div>
             <MessageCircle className="text-[#1d73e8]" size={22} />
           </div>
           <div className="grid gap-3">
-            <select
-              value={selectedClassId}
-              onChange={(event) => setSelectedClassId(event.target.value)}
-              className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]"
-            >
-              {classes.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={selectedChildId}
-              onChange={(event) => setSelectedChildId(event.target.value)}
-              className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]"
-            >
-              {roster.map((child) => (
-                <option key={child.id} value={child.id}>
-                  {child.display_name} - {child.parent.full_name}
-                </option>
-              ))}
-            </select>
+            <div className="rounded-lg border border-[#d0d8e4] bg-[#f8fafc] px-3 py-2">
+              <div className="text-xs font-bold uppercase tracking-wide text-[#667085]">Lớp đang chọn</div>
+              <div className="mt-1 text-sm font-bold text-[#172033]">
+                {selectedClass ? `${selectedClass.name} · ${selectedClass.class_code ?? "Chưa có mã"}` : "Chưa chọn lớp"}
+              </div>
+            </div>
+            {hasActiveStudents ? (
+              <select
+                value={selectedChildId}
+                onChange={(event) => setSelectedChildId(event.target.value)}
+                className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]"
+              >
+                {roster.map((child) => (
+                  <option key={child.id} value={child.id}>
+                    {child.display_name} - {child.parent.full_name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="rounded-lg border border-[#fedf89] bg-[#fffaeb] px-3 py-3 text-sm font-semibold text-[#b54708]">
+                Lớp này chưa có học sinh active nên chưa thể mở nhóm lớp hoặc trao đổi với phụ huynh.
+              </div>
+            )}
             <textarea
               value={contextMessage}
               onChange={(event) => setContextMessage(event.target.value)}
@@ -265,7 +273,7 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
             <div className="grid gap-2 sm:grid-cols-2">
               <button
                 onClick={handleCreateClassGroup}
-                disabled={!selectedClassId}
+                disabled={!selectedClassId || !hasActiveStudents}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#12b76a] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#0f9f5f] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <UsersRound size={16} />
@@ -303,7 +311,11 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
                 key={item.key}
                 onClick={() => {
                   setMode(item.key);
-                  const next = conversations.find((conversation) => conversation.conversation_type === item.key);
+                  const next = conversations.find(
+                    (conversation) =>
+                      conversation.conversation_type === item.key &&
+                      (!selectedClassId || conversation.class_id === selectedClassId || conversation.class_id === null),
+                  );
                   setSelectedId(next?.id ?? null);
                 }}
                 className={`rounded-lg border px-3 py-2 text-sm font-bold ${
@@ -345,7 +357,11 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
             {isLoading && <div className="rounded-lg bg-[#f8fafc] p-4 text-sm text-[#667085]">Đang tải hội thoại...</div>}
             {!isLoading && !visibleConversations.length && (
               <div className="rounded-lg bg-[#f8fafc] p-4 text-sm text-[#667085]">
-                Chưa có hội thoại trong tab này.
+                {!hasActiveStudents
+                  ? "Lớp này chưa có học sinh nên chưa có nhóm chat hoặc hội thoại phụ huynh."
+                  : mode === "CLASS_GROUP"
+                    ? "Chưa có nhóm chat cho lớp đang chọn. Bạn có thể mở nhóm lớp khi cần gửi thông báo chung."
+                    : "Chưa có hội thoại riêng trong lớp đang chọn."}
               </div>
             )}
           </div>
@@ -459,7 +475,9 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
         ) : (
           <div className="rounded-xl border border-[#dfe6ef] bg-white p-10 text-center text-[#667085] shadow-sm">
             <UsersRound className="mx-auto mb-3 text-[#98a2b3]" size={32} />
-            Chọn hoặc mở một hội thoại.
+            {!hasActiveStudents
+              ? "Lớp đang chọn chưa có học sinh, nên chưa có group chat phụ huynh."
+              : "Chọn hoặc mở một hội thoại trong lớp đang chọn."}
           </div>
         )}
       </div>

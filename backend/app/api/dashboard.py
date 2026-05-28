@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -24,7 +24,7 @@ from app.services.teacher_dashboard_service import (
 
 router = APIRouter(prefix="/teacher", tags=["teacher-dashboard"])
 
-VALID_STATUSES = {"DRAFT", "PUBLISHED", "CLOSED"}
+VALID_STATUSES = {"PUBLISHED", "CLOSED"}
 
 
 def _teacher_assignment_or_404(db: Session, teacher_id: UUID, assignment_id: UUID) -> Assignment:
@@ -41,8 +41,12 @@ def _teacher_assignment_or_404(db: Session, teacher_id: UUID, assignment_id: UUI
 def teacher_dashboard(
     current_user: Annotated[User, Depends(require_teacher)],
     db: Annotated[Session, Depends(get_db)],
+    class_id: Annotated[UUID | None, Query()] = None,
 ) -> TeacherDashboardResponse:
-    return get_teacher_dashboard(db, current_user.id)
+    try:
+        return get_teacher_dashboard(db, current_user.id, class_id=class_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/classes/{class_id}/analytics", response_model=ClassProgressItem)

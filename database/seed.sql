@@ -216,7 +216,7 @@ VALUES
     'Draw things around us',
     'Xem video trước, chọn một đồ vật quanh em để luyện nói và nộp kết quả sau khi hoàn thành.',
     now() + interval '14 days',
-    'DRAFT'
+    'PUBLISHED'
   ),
   (
     'dddddddd-dddd-dddd-dddd-ddddddddddd4',

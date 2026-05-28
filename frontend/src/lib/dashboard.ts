@@ -34,7 +34,7 @@ export type AssignmentProgressItem = {
   worksheet_file_url: string | null;
   answer_template_url: string | null;
   max_score: number;
-  status: "DRAFT" | "PUBLISHED" | "CLOSED";
+  status: "PUBLISHED" | "CLOSED";
   due_at: string | null;
   class_id: string;
   class_name: string;
@@ -54,7 +54,7 @@ export type AssignmentProgressItem = {
 };
 
 export type StatusBreakdownItem = {
-  status: "DRAFT" | "PUBLISHED" | "CLOSED";
+  status: "PUBLISHED" | "CLOSED";
   count: number;
 };
 
@@ -109,6 +109,7 @@ export type TeacherDashboardData = {
   recent_submissions: DashboardSubmissionItem[];
 };
 
-export function getTeacherDashboard(token: string): Promise<TeacherDashboardData> {
-  return apiRequest<TeacherDashboardData>("/teacher/dashboard", { token });
+export function getTeacherDashboard(token: string, classId?: string | null): Promise<TeacherDashboardData> {
+  const query = classId ? `?class_id=${encodeURIComponent(classId)}` : "";
+  return apiRequest<TeacherDashboardData>(`/teacher/dashboard${query}`, { token });
 }

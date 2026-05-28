@@ -167,6 +167,7 @@ def get_class_detail(
             title=assignment.title,
             status=assignment.status,
             lesson_title=lesson.title,
+            max_score=float(assignment.max_score or 10),
             due_at=assignment.due_at,
             submission_count=submission_count or 0,
         )

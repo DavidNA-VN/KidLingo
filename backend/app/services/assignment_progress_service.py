@@ -19,6 +19,7 @@ from app.schemas.teacher_assignment import (
     TeacherAssignmentDetail,
     TeacherAssignmentListItem,
 )
+from app.services.assignment_status_service import close_overdue_assignments
 from app.services.submission_types import (
     GRADED_STATUSES,
     PDF_ANSWER,
@@ -27,7 +28,7 @@ from app.services.submission_types import (
 )
 
 
-VALID_ASSIGNMENT_STATUSES = {"DRAFT", "PUBLISHED", "CLOSED"}
+VALID_ASSIGNMENT_STATUSES = {"PUBLISHED", "CLOSED"}
 VALID_ASSIGNMENT_TYPES = {"PDF_ASSIGNMENT"}
 
 
@@ -74,6 +75,9 @@ def _build_assignment_item(
     lesson: Lesson,
     active_child_count: int | None = None,
 ) -> TeacherAssignmentListItem:
+    material_count = db.scalar(
+        select(func.count()).select_from(LessonMaterial).where(LessonMaterial.lesson_id == lesson.id)
+    ) or 0
     active_count = active_child_count
     if active_count is None:
         active_count = db.scalar(
@@ -99,10 +103,6 @@ def _build_assignment_item(
         for submission in gradable_submissions
         if submission.score is not None and submission.grading_status in GRADED_STATUSES
     ]
-    material_count = db.scalar(
-        select(func.count()).select_from(LessonMaterial).where(LessonMaterial.lesson_id == lesson.id)
-    ) or 0
-
     return TeacherAssignmentListItem(
         assignment_id=assignment.id,
         assignment_type=assignment.assignment_type,
@@ -143,7 +143,13 @@ def list_teacher_assignments(
     status: str | None = None,
     class_id: UUID | None = None,
 ) -> list[TeacherAssignmentListItem]:
-    filters = [Class.teacher_id == teacher_id]
+    if class_id:
+        close_overdue_assignments(db, class_ids=[class_id])
+    else:
+        teacher_class_ids = db.scalars(select(Class.id).where(Class.teacher_id == teacher_id)).all()
+        close_overdue_assignments(db, class_ids=list(teacher_class_ids))
+
+    filters = [Class.teacher_id == teacher_id, Assignment.status.in_(VALID_ASSIGNMENT_STATUSES)]
     if status:
         filters.append(Assignment.status == status.upper())
     if class_id:
@@ -177,11 +183,12 @@ def list_teacher_assignments(
 
 
 def get_teacher_assignment_detail(db: Session, teacher_id: UUID, assignment_id: UUID) -> TeacherAssignmentDetail | None:
+    close_overdue_assignments(db, assignment_ids=[assignment_id])
     row = db.execute(
         select(Assignment, Class, Lesson)
         .join(Class, Class.id == Assignment.class_id)
         .join(Lesson, Lesson.id == Assignment.lesson_id)
-        .where(Assignment.id == assignment_id, Class.teacher_id == teacher_id)
+        .where(Assignment.id == assignment_id, Class.teacher_id == teacher_id, Assignment.status.in_(VALID_ASSIGNMENT_STATUSES))
     ).first()
     if not row:
         return None
@@ -193,6 +200,8 @@ def get_teacher_assignment_detail(db: Session, teacher_id: UUID, assignment_id: 
         .where(LessonMaterial.lesson_id == lesson.id)
         .order_by(LessonMaterial.sort_order.asc(), LessonMaterial.created_at.asc())
     ).all()
+    missing_children: list[MissingChildItem] = []
+    recent_submissions: list[AssignmentSubmissionPreview] = []
     submitted_child_ids = set(
         db.scalars(
             select(Submission.child_id).where(

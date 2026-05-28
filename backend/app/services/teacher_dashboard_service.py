@@ -12,6 +12,7 @@ from app.models.child import Child, ClassChild
 from app.models.classroom import Class
 from app.models.lesson import Lesson, LessonMaterial
 from app.models.submission import Submission
+from app.services.assignment_status_service import close_overdue_assignments
 from app.services.submission_types import GRADED_STATUSES, PDF_ANSWER, UNGRADED_STATUSES, is_gradable_submission
 from app.schemas.dashboard import (
     AssignmentProgressItem,
@@ -77,12 +78,19 @@ def _active_children_by_class(db: Session, class_ids: list[UUID]) -> dict[UUID, 
     return result
 
 
-def _assignment_progress_items(db: Session, teacher_id: UUID) -> list[AssignmentProgressItem]:
+def _assignment_progress_items(db: Session, teacher_id: UUID, class_id: UUID | None = None) -> list[AssignmentProgressItem]:
+    teacher_class_ids = db.scalars(select(Class.id).where(Class.teacher_id == teacher_id)).all()
+    if class_id is not None and class_id not in set(teacher_class_ids):
+        raise ValueError("CLASS_NOT_FOUND")
+    close_overdue_assignments(db, class_ids=[class_id] if class_id is not None else list(teacher_class_ids))
+    filters = [Class.teacher_id == teacher_id, Assignment.status.in_(["PUBLISHED", "CLOSED"])]
+    if class_id is not None:
+        filters.append(Assignment.class_id == class_id)
     rows = db.execute(
         select(Assignment, Class, Lesson)
         .join(Class, Class.id == Assignment.class_id)
         .join(Lesson, Lesson.id == Assignment.lesson_id)
-        .where(Class.teacher_id == teacher_id)
+        .where(*filters)
         .order_by(Assignment.created_at.desc())
     ).all()
     if not rows:
@@ -150,8 +158,14 @@ def _class_progress_items(
     db: Session,
     teacher_id: UUID,
     assignment_items: list[AssignmentProgressItem],
+    class_id: UUID | None = None,
 ) -> list[ClassProgressItem]:
-    classes = db.scalars(select(Class).where(Class.teacher_id == teacher_id).order_by(Class.created_at.desc())).all()
+    filters = [Class.teacher_id == teacher_id]
+    if class_id is not None:
+        filters.append(Class.id == class_id)
+    classes = db.scalars(select(Class).where(*filters).order_by(Class.created_at.desc())).all()
+    if class_id is not None and not classes:
+        raise ValueError("CLASS_NOT_FOUND")
     active_children = _active_children_by_class(db, [classroom.id for classroom in classes])
     assignments_by_class: dict[UUID, list[AssignmentProgressItem]] = defaultdict(list)
     for item in assignment_items:
@@ -181,13 +195,20 @@ def _class_progress_items(
     return result
 
 
-def _dashboard_submissions(db: Session, teacher_id: UUID) -> tuple[list[DashboardSubmissionItem], list[DashboardSubmissionItem]]:
+def _dashboard_submissions(
+    db: Session,
+    teacher_id: UUID,
+    class_id: UUID | None = None,
+) -> tuple[list[DashboardSubmissionItem], list[DashboardSubmissionItem]]:
+    filters = [Class.teacher_id == teacher_id]
+    if class_id is not None:
+        filters.append(Class.id == class_id)
     rows = db.execute(
         select(Submission, Child, Assignment, Class)
         .join(Assignment, Assignment.id == Submission.assignment_id)
         .join(Class, Class.id == Assignment.class_id)
         .join(Child, Child.id == Submission.child_id)
-        .where(Class.teacher_id == teacher_id)
+        .where(*filters)
         .order_by(Submission.created_at.desc())
         .limit(40)
     ).all()
@@ -221,18 +242,21 @@ def _dashboard_submissions(db: Session, teacher_id: UUID) -> tuple[list[Dashboar
     return recent[:8], review
 
 
-def _top_students(db: Session, teacher_id: UUID) -> list[TopStudentItem]:
+def _top_students(db: Session, teacher_id: UUID, class_id: UUID | None = None) -> list[TopStudentItem]:
+    filters = [
+        Class.teacher_id == teacher_id,
+        Submission.submission_type == PDF_ANSWER,
+        Submission.score.is_not(None),
+        Submission.grading_status.in_(GRADED_STATUSES),
+    ]
+    if class_id is not None:
+        filters.append(Class.id == class_id)
     rows = db.execute(
         select(Submission, Child, Class)
         .join(Assignment, Assignment.id == Submission.assignment_id)
         .join(Class, Class.id == Assignment.class_id)
         .join(Child, Child.id == Submission.child_id)
-        .where(
-            Class.teacher_id == teacher_id,
-            Submission.submission_type == PDF_ANSWER,
-            Submission.score.is_not(None),
-            Submission.grading_status.in_(GRADED_STATUSES),
-        )
+        .where(*filters)
     ).all()
     student_scores: dict[tuple[UUID, UUID], dict[str, object]] = {}
     for submission, child, classroom in rows:
@@ -268,10 +292,10 @@ def _top_students(db: Session, teacher_id: UUID) -> list[TopStudentItem]:
     return sorted(items, key=lambda item: (item.average_score, item.graded_submission_count), reverse=True)[:5]
 
 
-def get_teacher_dashboard(db: Session, teacher_id: UUID) -> TeacherDashboardResponse:
-    assignment_items = _assignment_progress_items(db, teacher_id)
-    class_items = _class_progress_items(db, teacher_id, assignment_items)
-    recent_submissions, review_submissions = _dashboard_submissions(db, teacher_id)
+def get_teacher_dashboard(db: Session, teacher_id: UUID, class_id: UUID | None = None) -> TeacherDashboardResponse:
+    assignment_items = _assignment_progress_items(db, teacher_id, class_id=class_id)
+    class_items = _class_progress_items(db, teacher_id, assignment_items, class_id=class_id)
+    recent_submissions, review_submissions = _dashboard_submissions(db, teacher_id, class_id=class_id)
 
     now = datetime.now(timezone.utc)
     seven_days_later = now + timedelta(days=7)
@@ -284,7 +308,7 @@ def get_teacher_dashboard(db: Session, teacher_id: UUID) -> TeacherDashboardResp
     status_counts = Counter(item.status for item in assignment_items)
     status_breakdown = [
         StatusBreakdownItem(status=status, count=status_counts.get(status, 0))
-        for status in ["DRAFT", "PUBLISHED", "CLOSED"]
+        for status in ["PUBLISHED", "CLOSED"]
     ]
     graded_pdf_items = [
         item
@@ -345,7 +369,7 @@ def get_teacher_dashboard(db: Session, teacher_id: UUID) -> TeacherDashboardResp
         pronunciation_pass_rate=pronunciation_pass_rate,
         ungraded_by_class=[item for item in class_items if item.ungraded_submission_count > 0],
         assignment_stats_by_class=class_items,
-        top_students=_top_students(db, teacher_id),
+        top_students=_top_students(db, teacher_id, class_id=class_id),
         upcoming_assignments=upcoming,
         review_submissions=review_submissions,
         recent_submissions=recent_submissions,
