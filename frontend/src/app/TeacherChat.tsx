@@ -19,6 +19,7 @@ import { getTeacherClassDetail, type RosterChild, type TeacherClassSummary } fro
 type TeacherChatProps = {
   classes: TeacherClassSummary[];
   selectedClassId?: string | null;
+  onOpenStudentProfile?: (classId: string | null | undefined, childId: string) => void;
 };
 
 function formatTime(value: string | null) {
@@ -42,7 +43,7 @@ function conversationTitle(conversation: ConversationSummary) {
   return conversation.parent_name ?? "Phụ huynh";
 }
 
-export function TeacherChat({ classes, selectedClassId: classContextId }: TeacherChatProps) {
+export function TeacherChat({ classes, selectedClassId: classContextId, onOpenStudentProfile }: TeacherChatProps) {
   const token = getStoredToken();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -80,6 +81,10 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
   const selectedChild = useMemo(
     () => roster.find((child) => child.id === selectedChildId) ?? null,
     [roster, selectedChildId],
+  );
+  const visibleMessages = useMemo(
+    () => messages.slice(Math.max(0, messages.length - 30)),
+    [messages],
   );
   const hasActiveStudents = roster.length > 0;
 
@@ -135,7 +140,9 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
       return;
     }
     listMessages(token, selectedId)
-      .then(setMessages)
+      .then((result) => {
+        setMessages(result);
+      })
       .catch((requestError) => setError(requestError instanceof Error ? requestError.message : "Không tải được tin nhắn"));
 
     socketRef.current?.close();
@@ -248,17 +255,26 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
               </div>
             </div>
             {hasActiveStudents ? (
-              <select
-                value={selectedChildId}
-                onChange={(event) => setSelectedChildId(event.target.value)}
-                className="rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]"
-              >
-                {roster.map((child) => (
-                  <option key={child.id} value={child.id}>
-                    {child.display_name} - {child.parent.full_name}
-                  </option>
-                ))}
-              </select>
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <select
+                  value={selectedChildId}
+                  onChange={(event) => setSelectedChildId(event.target.value)}
+                  className="min-w-0 rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm outline-none focus:border-[#1d73e8]"
+                >
+                  {roster.map((child) => (
+                    <option key={child.id} value={child.id}>
+                      {child.display_name} - {child.parent.full_name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => selectedChild && onOpenStudentProfile?.(selectedClassId, selectedChild.id)}
+                  disabled={!selectedChild}
+                  className="rounded-lg border border-[#1d73e8] px-3 py-2 text-xs font-bold text-[#155dcc] hover:bg-[#f2f7ff] disabled:opacity-50"
+                >
+                  Profile
+                </button>
+              </div>
             ) : (
               <div className="rounded-lg border border-[#fedf89] bg-[#fffaeb] px-3 py-3 text-sm font-semibold text-[#b54708]">
                 Lớp này chưa có học sinh active nên chưa thể mở nhóm lớp hoặc trao đổi với phụ huynh.
@@ -394,9 +410,19 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
                 <div className="flex flex-wrap gap-2 text-xs font-bold text-[#344054]">
                   <span className="rounded-full bg-[#f2f7ff] px-3 py-1.5">{selectedConversation.class_name ?? "Không gắn lớp"}</span>
                   <span className="rounded-full bg-[#f8fafc] px-3 py-1.5">
-                    {selectedConversation.conversation_type === "CLASS_GROUP"
-                      ? "Nhóm lớp"
-                      : selectedConversation.child_name ?? "Không gắn học sinh"}
+                    {selectedConversation.conversation_type === "CLASS_GROUP" ? (
+                      "Nhóm lớp"
+                    ) : selectedConversation.child_id ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenStudentProfile?.(selectedConversation.class_id, selectedConversation.child_id ?? "")}
+                        className="font-bold text-[#155dcc] hover:underline"
+                      >
+                        {selectedConversation.child_name ?? "Học sinh"}
+                      </button>
+                    ) : (
+                      "Không gắn học sinh"
+                    )}
                   </span>
                 </div>
               </div>
@@ -412,7 +438,13 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
                         className="rounded-full border border-[#d0d8e4] bg-white px-3 py-1.5 text-xs font-semibold text-[#344054]"
                         title={member.parent_email}
                       >
-                        {member.child_name} - {member.parent_name}
+                        <button
+                          onClick={() => onOpenStudentProfile?.(selectedConversation.class_id, member.child_id)}
+                          className="font-semibold text-[#155dcc] hover:underline"
+                        >
+                          {member.child_name}
+                        </button>
+                        <span> - {member.parent_name}</span>
                       </span>
                     ))}
                     {!groupMembers.length && <span className="text-sm text-[#667085]">Chưa có phụ huynh active trong lớp.</span>}
@@ -422,7 +454,7 @@ export function TeacherChat({ classes, selectedClassId: classContextId }: Teache
             </div>
 
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#f8fafc] px-5 py-5">
-              {messages.map((message) => (
+              {visibleMessages.map((message) => (
                 <div key={message.id} className={`flex ${message.is_mine ? "justify-end" : "justify-start"}`}>
                   <div
                     className={`max-w-[78%] rounded-2xl px-4 py-3 shadow-sm ${

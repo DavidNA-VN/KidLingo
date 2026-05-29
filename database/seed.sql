@@ -75,14 +75,16 @@ ON CONFLICT (class_code) DO UPDATE SET
   description = EXCLUDED.description,
   updated_at = now();
 
-INSERT INTO children (id, parent_id, display_name, birth_year, avatar_url, status, total_stars, total_coins)
+INSERT INTO children (id, parent_id, display_name, birth_year, nickname, avatar_url, profile_note, status, total_stars, total_coins)
 VALUES
   (
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1',
     '33333333-3333-3333-3333-333333333333',
     'Ben',
     2017,
+    'Ben Bear',
     NULL,
+    'Thich hoc bang hinh anh, can nhac cham khi doc tu moi.',
     'ACTIVE',
     12,
     40
@@ -92,7 +94,9 @@ VALUES
     '33333333-3333-3333-3333-333333333333',
     'Amy',
     2018,
+    'Mimi',
     NULL,
+    'Tap trung tot voi worksheet ngan, thich duoc khen bang sao.',
     'ACTIVE',
     6,
     20
@@ -102,7 +106,9 @@ VALUES
     '44444444-4444-4444-4444-444444444444',
     'Tom',
     2016,
+    'Tommy',
     NULL,
+    'Hay trung ten voi ban khac, can xem phu huynh va nam sinh khi cham bai.',
     'ACTIVE',
     9,
     30
@@ -110,9 +116,11 @@ VALUES
   (
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb4',
     '44444444-4444-4444-4444-444444444444',
-    'Archived Child',
+    'Tom',
     2015,
+    'Tom archived',
     NULL,
+    'Ho so luu tru de test truong hop trung ten.',
     'ARCHIVED',
     0,
     0
@@ -121,7 +129,9 @@ ON CONFLICT (id) DO UPDATE SET
   parent_id = EXCLUDED.parent_id,
   display_name = EXCLUDED.display_name,
   birth_year = EXCLUDED.birth_year,
+  nickname = EXCLUDED.nickname,
   avatar_url = EXCLUDED.avatar_url,
+  profile_note = EXCLUDED.profile_note,
   status = EXCLUDED.status,
   total_stars = EXCLUDED.total_stars,
   total_coins = EXCLUDED.total_coins,

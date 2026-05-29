@@ -106,7 +106,9 @@ def create_child(
         parent_id=current_user.id,
         display_name=payload.display_name.strip(),
         birth_year=payload.birth_year,
+        nickname=payload.nickname.strip() if payload.nickname else None,
         avatar_url=payload.avatar_url,
+        profile_note=payload.profile_note.strip() if payload.profile_note else None,
         status="ACTIVE",
     )
     db.add(child)
@@ -128,8 +130,12 @@ def update_child(
         child.display_name = payload.display_name.strip()
     if "birth_year" in payload.model_fields_set:
         child.birth_year = payload.birth_year
+    if "nickname" in payload.model_fields_set:
+        child.nickname = payload.nickname.strip() if payload.nickname else None
     if "avatar_url" in payload.model_fields_set:
         child.avatar_url = payload.avatar_url
+    if "profile_note" in payload.model_fields_set:
+        child.profile_note = payload.profile_note.strip() if payload.profile_note else None
     if payload.status is not None:
         status_value = payload.status.upper().strip()
         if status_value not in {"ACTIVE", "ARCHIVED"}:

@@ -16,6 +16,7 @@ from app.schemas.parent import (
     ParentSubmissionHistoryItem,
 )
 from app.services.parent_assignment_service import get_parent_child
+from app.services.submission_types import PDF_ANSWER
 
 
 def _published_assignment_ids_for_child(db: Session, child_id: UUID) -> list[UUID]:
@@ -41,6 +42,7 @@ def _submission_history(db: Session, child_id: UUID, limit: int = 20) -> list[Pa
         .join(ClassChild, ClassChild.class_id == Class.id)
         .where(
             Submission.child_id == child_id,
+            Submission.submission_type == PDF_ANSWER,
             ClassChild.child_id == child_id,
             ClassChild.status == "ACTIVE",
         )
@@ -98,24 +100,42 @@ def get_child_progress(db: Session, parent_id: UUID, child_id: UUID) -> ParentPr
         db.scalar(
             select(func.count(distinct(Submission.assignment_id))).where(
                 Submission.child_id == child_id,
+                Submission.submission_type == PDF_ANSWER,
                 Submission.assignment_id.in_(assignment_ids) if assignment_ids else False,
             )
         )
         or 0
     )
-    total_submissions = db.scalar(select(func.count(Submission.id)).where(Submission.child_id == child_id)) or 0
+    total_submissions = (
+        db.scalar(select(func.count(Submission.id)).where(Submission.child_id == child_id, Submission.submission_type == PDF_ANSWER))
+        or 0
+    )
     correct_submissions = (
-        db.scalar(select(func.count(Submission.id)).where(Submission.child_id == child_id, Submission.is_correct.is_(True)))
+        db.scalar(
+            select(func.count(Submission.id)).where(
+                Submission.child_id == child_id,
+                Submission.submission_type == PDF_ANSWER,
+                Submission.is_correct.is_(True),
+            )
+        )
         or 0
     )
     speech_passed_count = (
         db.scalar(
-            select(func.count(Submission.id)).where(Submission.child_id == child_id, Submission.speech_passed.is_(True))
+            select(func.count(Submission.id)).where(
+                Submission.child_id == child_id,
+                Submission.submission_type == PDF_ANSWER,
+                Submission.speech_passed.is_(True),
+            )
         )
         or 0
     )
-    average_confidence = db.scalar(select(func.avg(Submission.confidence)).where(Submission.child_id == child_id))
-    latest_submission_at = db.scalar(select(func.max(Submission.created_at)).where(Submission.child_id == child_id))
+    average_confidence = db.scalar(
+        select(func.avg(Submission.confidence)).where(Submission.child_id == child_id, Submission.submission_type == PDF_ANSWER)
+    )
+    latest_submission_at = db.scalar(
+        select(func.max(Submission.created_at)).where(Submission.child_id == child_id, Submission.submission_type == PDF_ANSWER)
+    )
     class_count = (
         db.scalar(select(func.count(ClassChild.class_id)).where(ClassChild.child_id == child_id, ClassChild.status == "ACTIVE"))
         or 0

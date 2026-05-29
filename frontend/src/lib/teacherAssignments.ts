@@ -41,6 +41,7 @@ export type TeacherAssignmentListItem = {
 
 export type AssignmentSubmissionPreview = {
   id: string;
+  child_id: string;
   child_name: string;
   submitted_at: string | null;
   grading_status: string;

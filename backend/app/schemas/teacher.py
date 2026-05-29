@@ -36,6 +36,7 @@ class RosterChild(BaseModel):
     id: UUID
     display_name: str
     birth_year: int | None
+    nickname: str | None = None
     status: str
     membership_status: str
     total_stars: int
@@ -48,6 +49,8 @@ class RecentSubmissionSummary(BaseModel):
     id: UUID
     child_id: UUID
     child_name: str
+    child_nickname: str | None = None
+    child_birth_year: int | None = None
     assignment_id: UUID
     assignment_title: str
     target_class: str | None
@@ -87,6 +90,7 @@ class ChildSearchResult(BaseModel):
     id: UUID
     display_name: str
     birth_year: int | None
+    nickname: str | None = None
     status: str
     total_stars: int
     total_coins: int
@@ -112,3 +116,36 @@ class MembershipResponse(BaseModel):
     joined_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TeacherStudentSubmissionSummary(BaseModel):
+    id: UUID
+    submission_type: str
+    assignment_id: UUID
+    assignment_title: str
+    score: float | None
+    max_score: float | None
+    grading_status: str
+    submitted_at: datetime | None
+    created_at: datetime
+
+
+class TeacherStudentProfile(BaseModel):
+    id: UUID
+    display_name: str
+    nickname: str | None
+    birth_year: int | None
+    age: int | None
+    avatar_url: str | None
+    profile_note: str | None
+    status: str
+    parent: ParentSummary
+    class_id: UUID
+    class_name: str
+    membership_status: str
+    joined_at: datetime
+    total_stars: int
+    total_coins: int
+    assignment_count: int
+    submission_count: int
+    latest_submissions: list[TeacherStudentSubmissionSummary]

@@ -22,6 +22,7 @@ export type RosterChild = {
   id: string;
   display_name: string;
   birth_year: number | null;
+  nickname: string | null;
   status: string;
   membership_status: string;
   total_stars: number;
@@ -44,6 +45,8 @@ export type RecentSubmissionSummary = {
   id: string;
   child_id: string;
   child_name: string;
+  child_nickname: string | null;
+  child_birth_year: number | null;
   assignment_id: string;
   assignment_title: string;
   target_class: string | null;
@@ -73,10 +76,42 @@ export type ChildSearchResult = {
   id: string;
   display_name: string;
   birth_year: number | null;
+  nickname: string | null;
   status: string;
   total_stars: number;
   total_coins: number;
   parent: ParentSummary;
+};
+
+export type TeacherStudentProfile = {
+  id: string;
+  display_name: string;
+  nickname: string | null;
+  birth_year: number | null;
+  age: number | null;
+  avatar_url: string | null;
+  profile_note: string | null;
+  status: string;
+  parent: ParentSummary;
+  class_id: string;
+  class_name: string;
+  membership_status: string;
+  joined_at: string;
+  total_stars: number;
+  total_coins: number;
+  assignment_count: number;
+  submission_count: number;
+  latest_submissions: Array<{
+    id: string;
+    submission_type: string;
+    assignment_id: string;
+    assignment_title: string;
+    score: number | null;
+    max_score: number | null;
+    grading_status: string;
+    submitted_at: string | null;
+    created_at: string;
+  }>;
 };
 
 export function listTeacherClasses(token: string): Promise<TeacherClassSummary[]> {
@@ -140,4 +175,12 @@ export function updateChildMembership(
     token,
     body: JSON.stringify({ status }),
   });
+}
+
+export function getTeacherStudentProfile(
+  token: string,
+  classId: string,
+  childId: string,
+): Promise<TeacherStudentProfile> {
+  return apiRequest<TeacherStudentProfile>(`/teacher/classes/${classId}/children/${childId}/profile`, { token });
 }

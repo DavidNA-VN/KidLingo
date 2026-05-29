@@ -1,12 +1,15 @@
 # Dependencies
 node_modules/
 .pnpm-store/
-
+KidLingo/
 # Python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
+.env
+.env.local
+.env.*
 
 # Build outputs
 dist/

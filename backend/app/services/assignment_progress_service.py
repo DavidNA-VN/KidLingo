@@ -232,6 +232,7 @@ def get_teacher_assignment_detail(db: Session, teacher_id: UUID, assignment_id: 
     recent_submissions = [
         AssignmentSubmissionPreview(
             id=submission.id,
+            child_id=child.id,
             child_name=child.display_name,
             submitted_at=submission.submitted_at or submission.created_at,
             grading_status=submission.grading_status,

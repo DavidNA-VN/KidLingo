@@ -30,6 +30,7 @@ type TeacherAssignmentsProps = {
   classes: TeacherClassSummary[];
   selectedClassId?: string | null;
   onOpenSubmissions?: (section: string, classId?: string, assignmentId?: string) => void;
+  onOpenStudentProfile?: (classId: string | null | undefined, childId: string) => void;
 };
 
 type AssignmentStatus = "PUBLISHED" | "CLOSED";
@@ -120,11 +121,13 @@ function AssignmentDetailPanel({
   detail,
   onSave,
   onOpenSubmissions,
+  onOpenStudentProfile,
   isSaving,
 }: {
   detail: TeacherAssignmentDetail;
   onSave: (payload: { title: string; instructions: string; due_at: string | null; max_score?: number }) => Promise<void>;
   onOpenSubmissions?: (section: string, classId?: string, assignmentId?: string) => void;
+  onOpenStudentProfile?: (classId: string | null | undefined, childId: string) => void;
   isSaving: boolean;
 }) {
   const [title, setTitle] = useState(detail.title);
@@ -289,7 +292,13 @@ function AssignmentDetailPanel({
               <div key={submission.id} className="rounded-lg bg-[#f8fafc] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-bold">{submission.child_name}</div>
+                    <button
+                      type="button"
+                      onClick={() => onOpenStudentProfile?.(detail.class_id, submission.child_id)}
+                      className="font-bold text-[#155dcc] hover:underline"
+                    >
+                      {submission.child_name}
+                    </button>
                     <div className="mt-1 text-sm text-[#667085]">{submission.grading_status}</div>
                   </div>
                   <div className="text-sm font-bold text-[#067647]">
@@ -316,7 +325,12 @@ function AssignmentDetailPanel({
           <div className="mt-4 space-y-3">
             {detail.missing_children.slice(0, 5).map((child) => (
               <div key={child.id} className="rounded-lg bg-[#f8fafc] p-4">
-                <div className="font-bold">{child.display_name}</div>
+                <button
+                  onClick={() => onOpenStudentProfile?.(detail.class_id, child.id)}
+                  className="font-bold text-[#155dcc] hover:underline"
+                >
+                  {child.display_name}
+                </button>
                 <div className="mt-1 text-sm text-[#667085]">{child.parent_name}</div>
                 <div className="mt-1 max-w-full truncate text-xs text-[#667085]">{child.parent_email}</div>
               </div>
@@ -336,7 +350,7 @@ function AssignmentDetailPanel({
   );
 }
 
-export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions }: TeacherAssignmentsProps) {
+export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions, onOpenStudentProfile }: TeacherAssignmentsProps) {
   const token = getStoredToken();
   const [items, setItems] = useState<TeacherAssignmentListItem[]>([]);
   const [lessons, setLessons] = useState<LessonSummary[]>([]);
@@ -692,7 +706,7 @@ export function TeacherAssignments({ classes, selectedClassId, onOpenSubmissions
         )}
 
         {detail ? (
-          <AssignmentDetailPanel detail={detail} onSave={handleSave} onOpenSubmissions={onOpenSubmissions} isSaving={isSaving} />
+          <AssignmentDetailPanel detail={detail} onSave={handleSave} onOpenSubmissions={onOpenSubmissions} onOpenStudentProfile={onOpenStudentProfile} isSaving={isSaving} />
         ) : (
           <div className="rounded-xl border border-[#dfe6ef] bg-white p-8 text-center text-[#667085] shadow-sm">
             <ListFilter className="mx-auto mb-3 text-[#98a2b3]" size={28} />

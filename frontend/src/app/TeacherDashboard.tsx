@@ -21,6 +21,7 @@ import { TeacherAssignments } from "./TeacherAssignments";
 import { TeacherChat } from "./TeacherChat";
 import { TeacherOverview } from "./TeacherOverview";
 import { TeacherSubmissions } from "./TeacherSubmissions";
+import { StudentProfileDrawer } from "./StudentProfileDrawer";
 import type { AuthUser } from "../lib/auth";
 import { getStoredToken } from "../lib/auth";
 import {
@@ -82,6 +83,7 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
   const [newClassDescription, setNewClassDescription] = useState("");
   const [activeSection, setActiveSection] = useState("Tổng quan");
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+  const [studentProfileTarget, setStudentProfileTarget] = useState<{ classId: string; childId: string } | null>(null);
   const [copiedClassCode, setCopiedClassCode] = useState("");
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [error, setError] = useState("");
@@ -170,6 +172,11 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
       setSelectedClassId(classId);
     }
     setSelectedAssignmentId(assignmentId ?? null);
+  }
+
+  function handleOpenStudentProfile(classId: string | null | undefined, childId: string) {
+    if (!classId) return;
+    setStudentProfileTarget({ classId, childId });
   }
 
   const selectedClass = classes.find((item) => item.id === selectedClassId) ?? null;
@@ -290,15 +297,15 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
           )}
 
           {activeSection === "Tổng quan" ? (
-            <TeacherOverview selectedClassId={selectedClassId} selectedClassName={selectedClass?.name} onOpenSection={handleOpenSection} />
+            <TeacherOverview selectedClassId={selectedClassId} selectedClassName={selectedClass?.name} onOpenSection={handleOpenSection} onOpenStudentProfile={handleOpenStudentProfile} />
           ) : activeSection === "Bài học" ? (
             <LessonStudio classes={classes} selectedClassId={selectedClassId} />
           ) : activeSection === "Bài giao" ? (
-            <TeacherAssignments classes={classes} selectedClassId={selectedClassId} onOpenSubmissions={handleOpenSection} />
+            <TeacherAssignments classes={classes} selectedClassId={selectedClassId} onOpenSubmissions={handleOpenSection} onOpenStudentProfile={handleOpenStudentProfile} />
           ) : activeSection === "Bài nộp" ? (
-            <TeacherSubmissions classes={classes} selectedClassId={selectedClassId} selectedAssignmentId={selectedAssignmentId} />
+            <TeacherSubmissions classes={classes} selectedClassId={selectedClassId} selectedAssignmentId={selectedAssignmentId} onOpenStudentProfile={handleOpenStudentProfile} />
           ) : activeSection === "Trao đổi" ? (
-            <TeacherChat classes={classes} selectedClassId={selectedClassId} />
+            <TeacherChat classes={classes} selectedClassId={selectedClassId} onOpenStudentProfile={handleOpenStudentProfile} />
           ) : (
           <section className="grid min-w-0 gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
             <div className="space-y-4">
@@ -397,7 +404,7 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
                             {classDetail.roster.map((child) => (
                               <tr key={child.id} className="align-middle">
                                 <td className="px-4 py-4">
-                                  <div className="font-bold">{child.display_name}</div>
+                                  <button onClick={() => handleOpenStudentProfile(classDetail.id, child.id)} className="font-bold text-[#155dcc] hover:underline">{child.display_name}</button>
                                   <div className="text-xs text-[#667085]">
                                     Năm sinh {child.birth_year ?? "N/A"}
                                   </div>
@@ -469,7 +476,7 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
                           <div key={submission.id} className="rounded-lg bg-[#f8fafc] p-4">
                             <div className="flex items-start justify-between gap-3">
                               <div>
-                                <div className="font-bold">{submission.child_name}</div>
+                                <button onClick={() => handleOpenStudentProfile(classDetail.id, submission.child_id)} className="font-bold text-[#155dcc] hover:underline">{submission.child_name}</button>
                                 <div className="text-sm text-[#667085]">{submission.assignment_title}</div>
                               </div>
                               <span
@@ -499,6 +506,11 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
           )}
         </div>
       </section>
+      <StudentProfileDrawer
+        classId={studentProfileTarget?.classId ?? null}
+        childId={studentProfileTarget?.childId ?? null}
+        onClose={() => setStudentProfileTarget(null)}
+      />
     </main>
   );
 }

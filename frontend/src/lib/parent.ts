@@ -4,7 +4,9 @@ export type ParentChild = {
   id: string;
   display_name: string;
   birth_year: number | null;
+  nickname: string | null;
   avatar_url: string | null;
+  profile_note: string | null;
   status: "ACTIVE" | "ARCHIVED";
   total_stars: number;
   total_coins: number;
@@ -104,7 +106,7 @@ export function listParentChildren(token: string): Promise<ParentChild[]> {
 
 export function createParentChild(
   token: string,
-  payload: { display_name: string; birth_year?: number | null; avatar_url?: string | null },
+  payload: { display_name: string; birth_year: number; nickname?: string | null; avatar_url?: string | null; profile_note?: string | null },
 ): Promise<ParentChild> {
   return apiRequest<ParentChild>("/parent/children", {
     method: "POST",
@@ -116,7 +118,7 @@ export function createParentChild(
 export function updateParentChild(
   token: string,
   childId: string,
-  payload: { display_name?: string; birth_year?: number | null; avatar_url?: string | null; status?: "ACTIVE" | "ARCHIVED" },
+  payload: { display_name?: string; birth_year?: number | null; nickname?: string | null; avatar_url?: string | null; profile_note?: string | null; status?: "ACTIVE" | "ARCHIVED" },
 ): Promise<ParentChild> {
   return apiRequest<ParentChild>(`/parent/children/${childId}`, {
     method: "PATCH",

@@ -8,14 +8,18 @@ from app.schemas.lesson import LessonMaterialPublic
 
 class ParentChildCreate(BaseModel):
     display_name: str = Field(min_length=1, max_length=120)
-    birth_year: int | None = Field(default=None, ge=2010, le=2030)
+    birth_year: int = Field(ge=2010, le=2030)
+    nickname: str | None = Field(default=None, max_length=80)
     avatar_url: str | None = Field(default=None, max_length=1000)
+    profile_note: str | None = Field(default=None, max_length=2000)
 
 
 class ParentChildUpdate(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=120)
     birth_year: int | None = Field(default=None, ge=2010, le=2030)
+    nickname: str | None = Field(default=None, max_length=80)
     avatar_url: str | None = Field(default=None, max_length=1000)
+    profile_note: str | None = Field(default=None, max_length=2000)
     status: str | None = Field(default=None, min_length=3, max_length=20)
 
 
@@ -23,7 +27,9 @@ class ParentChildPublic(BaseModel):
     id: UUID
     display_name: str
     birth_year: int | None
+    nickname: str | None
     avatar_url: str | None
+    profile_note: str | None
     status: str
     total_stars: int
     total_coins: int

@@ -27,6 +27,8 @@ from app.schemas.teacher import (
     TeacherClassDetail,
     TeacherClassSummary,
     TeacherClassUpdate,
+    TeacherStudentProfile,
+    TeacherStudentSubmissionSummary,
 )
 from app.services.class_code_service import generate_unique_class_code
 
@@ -143,6 +145,7 @@ def get_class_detail(
             id=child.id,
             display_name=child.display_name,
             birth_year=child.birth_year,
+            nickname=child.nickname,
             status=child.status,
             membership_status=link.status,
             total_stars=child.total_stars,
@@ -187,6 +190,8 @@ def get_class_detail(
             id=submission.id,
             child_id=child.id,
             child_name=child.display_name,
+            child_nickname=child.nickname,
+            child_birth_year=child.birth_year,
             assignment_id=assignment.id,
             assignment_title=assignment.title,
             target_class=submission.target_class,
@@ -265,6 +270,7 @@ def search_children(
                 id=child.id,
                 display_name=child.display_name,
                 birth_year=child.birth_year,
+                nickname=child.nickname,
                 status=child.status,
                 total_stars=child.total_stars,
                 total_coins=child.total_coins,
@@ -319,3 +325,79 @@ def update_child_membership(
     db.commit()
     db.refresh(membership)
     return membership
+
+
+@router.get("/classes/{class_id}/children/{child_id}/profile", response_model=TeacherStudentProfile)
+def get_student_profile(
+    class_id: UUID,
+    child_id: UUID,
+    current_user: Annotated[User, Depends(require_teacher)],
+    db: Annotated[Session, Depends(get_db)],
+) -> TeacherStudentProfile:
+    classroom = _teacher_class_or_404(db, current_user.id, class_id)
+    row = db.execute(
+        select(ClassChild, Child, User)
+        .join(Child, Child.id == ClassChild.child_id)
+        .join(User, User.id == Child.parent_id)
+        .where(ClassChild.class_id == class_id, ClassChild.child_id == child_id)
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="STUDENT_NOT_FOUND")
+
+    membership, child, parent = row
+    assignment_count = db.scalar(
+        select(func.count()).select_from(Assignment).where(Assignment.class_id == class_id)
+    ) or 0
+    submission_count = db.scalar(
+        select(func.count())
+        .select_from(Submission)
+        .join(Assignment, Assignment.id == Submission.assignment_id)
+        .where(Assignment.class_id == class_id, Submission.child_id == child_id)
+    ) or 0
+    submission_rows = db.execute(
+        select(Submission, Assignment)
+        .join(Assignment, Assignment.id == Submission.assignment_id)
+        .where(Assignment.class_id == class_id, Submission.child_id == child_id)
+        .order_by(Submission.created_at.desc())
+        .limit(5)
+    ).all()
+
+    age = None
+    if child.birth_year:
+        from datetime import datetime, timezone
+
+        age = datetime.now(timezone.utc).year - child.birth_year
+
+    return TeacherStudentProfile(
+        id=child.id,
+        display_name=child.display_name,
+        nickname=child.nickname,
+        birth_year=child.birth_year,
+        age=age,
+        avatar_url=child.avatar_url,
+        profile_note=child.profile_note,
+        status=child.status,
+        parent=ParentSummary(id=parent.id, full_name=parent.full_name, email=parent.email),
+        class_id=classroom.id,
+        class_name=classroom.name,
+        membership_status=membership.status,
+        joined_at=membership.joined_at,
+        total_stars=child.total_stars,
+        total_coins=child.total_coins,
+        assignment_count=int(assignment_count),
+        submission_count=int(submission_count),
+        latest_submissions=[
+            TeacherStudentSubmissionSummary(
+                id=submission.id,
+                submission_type=submission.submission_type,
+                assignment_id=assignment.id,
+                assignment_title=assignment.title,
+                score=float(submission.score) if submission.score is not None else None,
+                max_score=float(submission.max_score) if submission.max_score is not None else None,
+                grading_status=submission.grading_status,
+                submitted_at=submission.submitted_at,
+                created_at=submission.created_at,
+            )
+            for submission, assignment in submission_rows
+        ],
+    )

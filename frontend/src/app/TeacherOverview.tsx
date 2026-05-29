@@ -31,6 +31,7 @@ type TeacherOverviewProps = {
   selectedClassId: string | null;
   selectedClassName?: string | null;
   onOpenSection?: (section: string, classId?: string) => void;
+  onOpenStudentProfile?: (classId: string | null | undefined, childId: string) => void;
 };
 
 const statusLabels: Record<string, string> = {
@@ -78,7 +79,7 @@ function SummaryCard({
   );
 }
 
-export function TeacherOverview({ selectedClassId, selectedClassName, onOpenSection }: TeacherOverviewProps) {
+export function TeacherOverview({ selectedClassId, selectedClassName, onOpenSection, onOpenStudentProfile }: TeacherOverviewProps) {
   const token = getStoredToken();
   const [data, setData] = useState<TeacherDashboardData | null>(null);
   const [error, setError] = useState("");
@@ -270,7 +271,12 @@ export function TeacherOverview({ selectedClassId, selectedClassName, onOpenSect
                     {index + 1}
                   </span>
                   <div className="min-w-0">
-                    <div className="truncate font-bold">{item.child_name}</div>
+                    <button
+                      onClick={() => onOpenStudentProfile?.(item.class_id, item.child_id)}
+                      className="truncate font-bold text-[#155dcc] hover:underline"
+                    >
+                      {item.child_name}
+                    </button>
                     <div className="text-sm text-[#667085]">{item.class_name}</div>
                   </div>
                 </div>
@@ -341,7 +347,14 @@ export function TeacherOverview({ selectedClassId, selectedClassName, onOpenSect
               <tbody className="divide-y divide-[#edf1f5]">
                 {data.recent_submissions.slice(0, 5).map((item) => (
                   <tr key={item.id}>
-                    <td className="px-4 py-3 font-bold">{item.child_name}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => onOpenStudentProfile?.(item.class_id, item.child_id)}
+                        className="font-bold text-[#155dcc] hover:underline"
+                      >
+                        {item.child_name}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 text-[#667085]">{item.class_name}</td>
                     <td className="px-4 py-3 text-[#667085]">{item.assignment_title}</td>
                     <td className="px-4 py-3 text-[#667085]">{item.grading_status}</td>

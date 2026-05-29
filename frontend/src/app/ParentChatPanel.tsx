@@ -54,6 +54,7 @@ export function ParentChatPanel({ token, child, classes = [] }: ParentChatPanelP
     () => childConversations.find((conversation) => conversation.id === selectedId) ?? childConversations[0] ?? null,
     [childConversations, selectedId],
   );
+  const visibleMessages = useMemo(() => messages.slice(Math.max(0, messages.length - 30)), [messages]);
 
   async function loadConversations() {
     setError("");
@@ -151,7 +152,7 @@ export function ParentChatPanel({ token, child, classes = [] }: ParentChatPanelP
         </div>
 
         {selectedConversation ? (
-          <div className="flex min-h-[420px] min-w-0 flex-col rounded-lg border border-[#e4eaf2]">
+          <div className="flex h-[520px] min-w-0 flex-col rounded-lg border border-[#e4eaf2]">
             <div className="border-b border-[#edf1f5] px-4 py-3">
               <div className="font-bold">{conversationTitle(selectedConversation)}</div>
               <div className="text-xs font-semibold text-[#667085]">
@@ -159,7 +160,7 @@ export function ParentChatPanel({ token, child, classes = [] }: ParentChatPanelP
               </div>
             </div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#f8fafc] p-4">
-              {messages.map((message) => (
+              {visibleMessages.map((message) => (
                 <div key={message.id} className={`flex ${message.is_mine ? "justify-end" : "justify-start"}`}>
                   <div
                     className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${

@@ -28,6 +28,7 @@ class MissingChildItem(BaseModel):
 
 class AssignmentSubmissionPreview(BaseModel):
     id: UUID
+    child_id: UUID
     child_name: str
     submitted_at: datetime | None
     grading_status: str

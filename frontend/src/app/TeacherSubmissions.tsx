@@ -15,6 +15,7 @@ type TeacherSubmissionsProps = {
   classes: TeacherClassSummary[];
   selectedClassId?: string | null;
   selectedAssignmentId?: string | null;
+  onOpenStudentProfile?: (classId: string | null | undefined, childId: string) => void;
 };
 
 function formatDate(value: string) {
@@ -57,10 +58,12 @@ function ResultBadge({ item }: { item: TeacherSubmissionListItem }) {
 function SubmissionDetailPanel({
   detail,
   onSave,
+  onOpenStudentProfile,
   isSaving,
 }: {
   detail: TeacherSubmissionDetail;
   onSave: (payload: { feedback: string; score: string }) => Promise<void>;
+  onOpenStudentProfile?: (classId: string | null | undefined, childId: string) => void;
   isSaving: boolean;
 }) {
   const [feedback, setFeedback] = useState(detail.teacher_feedback ?? "");
@@ -90,7 +93,12 @@ function SubmissionDetailPanel({
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-bold">{detail.child_name}</h2>
+              <button
+                onClick={() => onOpenStudentProfile?.(detail.class_id, detail.child_id)}
+                className="text-xl font-bold text-[#155dcc] hover:underline"
+              >
+                {detail.child_name}
+              </button>
               <ResultBadge item={detail} />
             </div>
             <p className="text-sm text-[#667085]">
@@ -177,7 +185,7 @@ function SubmissionDetailPanel({
   );
 }
 
-export function TeacherSubmissions({ classes, selectedClassId, selectedAssignmentId }: TeacherSubmissionsProps) {
+export function TeacherSubmissions({ classes, selectedClassId, selectedAssignmentId, onOpenStudentProfile }: TeacherSubmissionsProps) {
   const token = getStoredToken();
   const [items, setItems] = useState<TeacherSubmissionListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -402,16 +410,33 @@ export function TeacherSubmissions({ classes, selectedClassId, selectedAssignmen
 
         <div className="space-y-2">
           {items.map((item) => (
-            <button
+            <div
               key={item.id}
               onClick={() => setSelectedId(item.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setSelectedId(item.id);
+                }
+              }}
               className={`w-full rounded-xl border bg-white p-4 text-left shadow-sm transition ${
                 selectedId === item.id ? "border-[#1d73e8] bg-[#f2f7ff]" : "border-[#e4eaf2] hover:bg-[#f8fafc]"
               }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="truncate font-bold">{item.child_name}</div>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onOpenStudentProfile?.(item.class_id, item.child_id);
+                    }}
+                    className="truncate font-bold text-[#155dcc] hover:underline"
+                  >
+                    {item.child_name}
+                  </button>
                   <div className="mt-1 text-sm text-[#667085]">{item.assignment_title}</div>
                 </div>
                 <ResultBadge item={item} />
@@ -427,7 +452,7 @@ export function TeacherSubmissions({ classes, selectedClassId, selectedAssignmen
                   {item.review_reason}
                 </div>
               )}
-            </button>
+            </div>
           ))}
           {isLoading && <div className="rounded-xl bg-white p-5 text-sm text-[#667085]">Đang tải bài nộp...</div>}
           {!isLoading && !items.length && (
@@ -449,7 +474,7 @@ export function TeacherSubmissions({ classes, selectedClassId, selectedAssignmen
           </div>
         )}
         {detail ? (
-          <SubmissionDetailPanel detail={detail} onSave={handleSaveFeedback} isSaving={isSaving} />
+          <SubmissionDetailPanel detail={detail} onSave={handleSaveFeedback} onOpenStudentProfile={onOpenStudentProfile} isSaving={isSaving} />
         ) : (
           <div className="rounded-xl border border-[#dfe6ef] bg-white p-8 text-center text-[#667085] shadow-sm">
             Chọn một bài nộp để xem chi tiết.
