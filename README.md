@@ -80,57 +80,57 @@ AI health must show `model_loaded: true` before doodle prediction works.
 
 ### 1. Landing Page
 
-Trang giới thiệu và điểm bắt đầu đăng nhập vào hệ thống.
+The public landing page and entry point for signing in to the platform.
 
 <img src="image/Landing-page.png" alt="Landing page" width="100%">
 
 ### 2. Teacher Workspace
 
-Giáo viên theo dõi số liệu tổng quan, quản lý lớp học, bài học, bài giao và quy trình duyệt bài nộp.
+Teachers monitor operational metrics and manage classes, lessons, assignments, and submission reviews.
 
-#### Dashboard tổng quan
+#### Overview Dashboard
 
-<img src="image/Dashboard-teacher1.png" alt="Dashboard tổng quan của giáo viên" width="100%">
+<img src="image/Dashboard-teacher1.png" alt="Teacher overview dashboard" width="100%">
 
-#### Quản lý lớp học
+#### Class Management
 
-<img src="image/Lop-hoc.png" alt="Quản lý lớp học" width="100%">
+<img src="image/Lop-hoc.png" alt="Class management" width="100%">
 
-#### Quản lý bài giao
+#### Assignment Management
 
-<img src="image/Bai-giao.png" alt="Quản lý bài giao" width="100%">
+<img src="image/Bai-giao.png" alt="Assignment management" width="100%">
 
 ### 3. Parent And Student Learning
 
-Phụ huynh quản lý hồ sơ của trẻ, theo dõi tiến độ, kiểm tra lớp đang học và mở hoạt động luyện từ vựng bằng hình vẽ có AI hỗ trợ.
+Parents manage child profiles, track learning progress, review active classes, and open AI-assisted doodle vocabulary activities.
 
-#### Hồ sơ học sinh
+#### Student Profile
 
-<img src="image/Profile-student.png" alt="Hồ sơ học sinh" width="100%">
+<img src="image/Profile-student.png" alt="Student profile" width="100%">
 
 #### AI Doodle Vocabulary Game
 
-Học sinh vẽ hình, gửi dự đoán đến AI service và nhận phản hồi trong luồng luyện từ vựng.
+Students draw an image, send it to the AI service for prediction, and receive feedback during vocabulary practice.
 
 <img src="image/Demo-doodle.png" alt="Demo AI doodle" width="100%">
 
 ### 4. Teacher And Parent Communication
 
-Teacher và parent trao đổi trực tiếp hoặc trong nhóm lớp để hỗ trợ quá trình học tại nhà.
+Teachers and parents communicate directly or through class group chats to support learning at home.
 
-<img src="image/Trao-doi-teacher.png" alt="Trao đổi từ phía giáo viên" width="100%">
+<img src="image/Trao-doi-teacher.png" alt="Teacher communication workspace" width="100%">
 
 ### 5. Admin Security Monitoring
 
-Admin có workspace riêng để quan sát sức khỏe hệ thống, theo dõi rủi ro và truy vết sự kiện audit.
+Admins have a dedicated workspace for monitoring system health, reviewing risk signals, and tracing audit events.
 
-#### Tổng quan hệ thống
+#### System Overview
 
-<img src="image/tong-quan-he-thong-admin.png" alt="Tổng quan hệ thống admin" width="100%">
+<img src="image/tong-quan-he-thong-admin.png" alt="Admin system overview" width="100%">
 
-#### Giám sát bảo mật
+#### Security Monitoring
 
-<img src="image/giam-sat-bao-mat-admin.png" alt="Giám sát bảo mật admin" width="100%">
+<img src="image/giam-sat-bao-mat-admin.png" alt="Admin security monitoring" width="100%">
 
 #### Audit Explorer
 
