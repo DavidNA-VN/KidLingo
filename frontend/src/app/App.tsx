@@ -2,6 +2,7 @@ import { ImageWithFallback } from './components/figma/ImageWithFallback';
 import { useState, useEffect } from 'react';
 import { ParentDashboard } from './ParentDashboard';
 import { TeacherDashboard } from './TeacherDashboard';
+import { AdminDashboard } from './AdminDashboard';
 import {
   clearSession,
   fetchMe,
@@ -27,7 +28,7 @@ export default function App() {
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
-  const [registerRole, setRegisterRole] = useState<UserRole>('PARENT');
+  const [registerRole, setRegisterRole] = useState<Exclude<UserRole, 'ADMIN'>>('PARENT');
   const [registerError, setRegisterError] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
 
@@ -151,6 +152,10 @@ export default function App() {
 
   if (currentUser?.role === 'PARENT') {
     return <ParentDashboard user={currentUser} onLogout={handleLogout} />;
+  }
+
+  if (currentUser?.role === 'ADMIN') {
+    return <AdminDashboard user={currentUser} onLogout={handleLogout} />;
   }
 
   return (
@@ -472,7 +477,7 @@ export default function App() {
 
               <select
                 value={registerRole}
-                onChange={(event) => setRegisterRole(event.target.value as UserRole)}
+                onChange={(event) => setRegisterRole(event.target.value as Exclude<UserRole, 'ADMIN'>)}
                 className="w-full px-4 py-3 bg-[#f5f6f8] border-2 border-transparent rounded-xl text-base focus:outline-none focus:border-[#ffc107] focus:bg-white transition-all"
               >
                 <option value="PARENT">Phụ huynh</option>

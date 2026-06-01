@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,7 @@ from app.schemas.teacher import (
     TeacherStudentSubmissionSummary,
 )
 from app.services.class_code_service import generate_unique_class_code
+from app.services.audit_service import AuditAction, commit_audit_event, get_request_context
 
 router = APIRouter(prefix="/teacher", tags=["teacher"])
 
@@ -96,6 +97,7 @@ def list_classes(
 @router.post("/classes", response_model=TeacherClassSummary, status_code=status.HTTP_201_CREATED)
 def create_class(
     payload: TeacherClassCreate,
+    request: Request,
     current_user: Annotated[User, Depends(require_teacher)],
     db: Annotated[Session, Depends(get_db)],
 ) -> TeacherClassSummary:
@@ -114,6 +116,15 @@ def create_class(
     db.add(classroom)
     db.commit()
     db.refresh(classroom)
+    commit_audit_event(
+        db,
+        action=AuditAction.CLASS_CREATED,
+        actor=current_user,
+        resource_type="CLASS",
+        resource_id=classroom.id,
+        request_context=get_request_context(request),
+        metadata={"class_code": classroom.class_code},
+    )
     return TeacherClassSummary(
         id=classroom.id,
         name=classroom.name,
@@ -221,6 +232,7 @@ def get_class_detail(
 def update_class(
     class_id: UUID,
     payload: TeacherClassUpdate,
+    request: Request,
     current_user: Annotated[User, Depends(require_teacher)],
     db: Annotated[Session, Depends(get_db)],
 ) -> TeacherClassSummary:
@@ -231,6 +243,15 @@ def update_class(
         classroom.description = payload.description.strip() or None
     db.commit()
     db.refresh(classroom)
+    commit_audit_event(
+        db,
+        action=AuditAction.CLASS_UPDATED,
+        actor=current_user,
+        resource_type="CLASS",
+        resource_id=classroom.id,
+        request_context=get_request_context(request),
+        metadata={"updated_fields": sorted(payload.model_fields_set)},
+    )
     return TeacherClassSummary(
         id=classroom.id,
         name=classroom.name,

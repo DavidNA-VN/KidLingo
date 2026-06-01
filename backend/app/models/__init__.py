@@ -1,4 +1,5 @@
 from app.models.assignment import Assignment
+from app.models.audit_log import AuditLog
 from app.models.chat import Conversation, Message
 from app.models.child import Child, ClassChild
 from app.models.classroom import Class
@@ -8,6 +9,7 @@ from app.models.user import User
 
 __all__ = [
     "Assignment",
+    "AuditLog",
     "Child",
     "Class",
     "ClassChild",

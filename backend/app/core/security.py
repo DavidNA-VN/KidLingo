@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 import bcrypt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy import select
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.user import User
+from app.services.audit_service import AuditAction, commit_audit_event, get_request_context
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -59,26 +60,60 @@ def get_current_user(
 
 
 def require_role(required_role: str):
-    def dependency(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+    def dependency(
+        current_user: Annotated[User, Depends(get_current_user)],
+        request: Request,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> User:
         if current_user.role != required_role:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"{required_role} role required",
-            )
+            _raise_access_denied(db, request, current_user, required_role)
         return current_user
 
     return dependency
 
 
-def require_teacher(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+def _raise_access_denied(db: Session, request: Request, current_user: User, required_role: str) -> None:
+    commit_audit_event(
+        db,
+        action=AuditAction.AUTH_ACCESS_DENIED,
+        actor=current_user,
+        result="DENIED",
+        category="AUTH",
+        resource_type="ENDPOINT",
+        resource_id=request.url.path,
+        request_context=get_request_context(request),
+        metadata={"required_role": required_role},
+    )
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"{required_role} role required")
+
+
+def require_teacher(
+    current_user: Annotated[User, Depends(get_current_user)],
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> User:
     if current_user.role != "TEACHER":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="TEACHER role required")
+        _raise_access_denied(db, request, current_user, "TEACHER")
     return current_user
 
 
-def require_parent(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+def require_parent(
+    current_user: Annotated[User, Depends(get_current_user)],
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> User:
     if current_user.role != "PARENT":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="PARENT role required")
+        _raise_access_denied(db, request, current_user, "PARENT")
+    return current_user
+
+
+def require_admin(
+    current_user: Annotated[User, Depends(get_current_user)],
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> User:
+    if current_user.role != "ADMIN":
+        _raise_access_denied(db, request, current_user, "ADMIN")
     return current_user
 
 

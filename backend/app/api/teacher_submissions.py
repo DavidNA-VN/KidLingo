@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -18,6 +18,7 @@ from app.services.submission_review_service import (
     list_teacher_submissions,
     update_teacher_submission_review,
 )
+from app.services.audit_service import AuditAction, commit_audit_event, get_request_context
 
 router = APIRouter(prefix="/teacher", tags=["teacher-submissions"])
 
@@ -89,6 +90,7 @@ def get_submission_detail(
 def patch_submission_review(
     submission_id: UUID,
     payload: TeacherSubmissionReviewUpdate,
+    request: Request,
     current_user: Annotated[User, Depends(require_teacher)],
     db: Annotated[Session, Depends(get_db)],
 ) -> TeacherSubmissionDetail:
@@ -107,4 +109,13 @@ def patch_submission_review(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not detail:
         raise HTTPException(status_code=404, detail="SUBMISSION_NOT_FOUND")
+    commit_audit_event(
+        db,
+        action=AuditAction.SUBMISSION_GRADED,
+        actor=current_user,
+        resource_type="SUBMISSION",
+        resource_id=submission_id,
+        request_context=get_request_context(request),
+        metadata={"grading_status": detail.grading_status, "score": detail.score, "reviewed": detail.reviewed_at is not None},
+    )
     return detail

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.assignments import router as assignments_router
+from app.api.admin import router as admin_router
 from app.api.ai import router as ai_router
 from app.api.auth import router as auth_router
 from app.api.chat import router as chat_router
@@ -37,6 +38,7 @@ app.mount("/uploads", StaticFiles(directory=settings.upload_path), name="uploads
 app.include_router(health_router)
 app.include_router(health_router, prefix=settings.api_v1_prefix)
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
+app.include_router(admin_router, prefix=settings.api_v1_prefix)
 app.include_router(teacher_router, prefix=settings.api_v1_prefix)
 app.include_router(parent_router, prefix=settings.api_v1_prefix)
 app.include_router(teacher_assignments_router, prefix=settings.api_v1_prefix)

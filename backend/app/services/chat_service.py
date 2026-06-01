@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import and_, func, or_, select
@@ -11,6 +12,7 @@ from app.models.child import Child, ClassChild
 from app.models.classroom import Class
 from app.models.user import User
 from app.schemas.chat import ClassGroupMember, ClassGroupMembersResponse, ConversationSummary, MessagePublic
+from app.services.audit_service import AuditAction, commit_audit_event
 
 
 DIRECT = "DIRECT"
@@ -291,7 +293,14 @@ def _to_message_public(message: Message, current_user_id: UUID) -> MessagePublic
     )
 
 
-def create_message(db: Session, user: User, conversation_id: UUID, body: str) -> MessagePublic | None:
+def create_message(
+    db: Session,
+    user: User,
+    conversation_id: UUID,
+    body: str,
+    *,
+    request_context: dict[str, Any] | None = None,
+) -> MessagePublic | None:
     conversation = user_can_access_conversation(db, user.id, conversation_id)
     if not conversation:
         return None
@@ -300,4 +309,14 @@ def create_message(db: Session, user: User, conversation_id: UUID, body: str) ->
     db.add(message)
     db.commit()
     db.refresh(message)
+    commit_audit_event(
+        db,
+        action=AuditAction.CHAT_MESSAGE_SENT,
+        actor=user,
+        category="CHAT",
+        resource_type="CONVERSATION",
+        resource_id=conversation_id,
+        request_context=request_context,
+        metadata={"message_id": message.id},
+    )
     return _to_message_public(message, user.id)

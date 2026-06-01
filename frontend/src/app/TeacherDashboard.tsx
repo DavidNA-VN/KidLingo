@@ -14,7 +14,7 @@ import {
   Star,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { LessonStudio } from "./LessonStudio";
 import { TeacherAssignments } from "./TeacherAssignments";
@@ -89,16 +89,6 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
   const [error, setError] = useState("");
 
   const token = getStoredToken();
-
-  const totals = useMemo(
-    () => ({
-      classes: classes.length,
-      children: classes.reduce((sum, item) => sum + item.active_child_count, 0),
-      assignments: classes.reduce((sum, item) => sum + item.assignment_count, 0),
-      submissions: classes.reduce((sum, item) => sum + item.submission_count, 0),
-    }),
-    [classes],
-  );
 
   async function loadClasses(selectFirst = false) {
     if (!token) return;
@@ -180,17 +170,6 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
   }
 
   const selectedClass = classes.find((item) => item.id === selectedClassId) ?? null;
-  const scopedTotals = selectedClass
-    ? {
-        classes: 1,
-        children: selectedClass.active_child_count,
-        assignments: selectedClass.assignment_count,
-        submissions: selectedClass.submission_count,
-      }
-    : totals;
-  const displayTotals = scopedTotals;
-  const showClassContext = true;
-
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f4f7fb] text-[#172033]">
       <header className="sticky top-0 z-20 border-b border-[#dfe6ef] bg-white/95 backdrop-blur">
@@ -255,46 +234,27 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
             </div>
           )}
 
-          <section className="grid gap-4 md:grid-cols-4">
-            {[
-              ["Lớp học", displayTotals.classes, UsersRound],
-              ["Học sinh đang học", displayTotals.children, GraduationCap],
-              ["Bài giao", displayTotals.assignments, BookOpen],
-              ["Bài nộp", displayTotals.submissions, CheckCircle2],
-            ].map(([label, value, Icon]) => (
-              <div key={label as string} className="rounded-xl border border-[#dfe6ef] bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-[#667085]">{label as string}</div>
-                  <Icon className="text-[#1d73e8]" size={20} />
+          <section className="rounded-xl border border-[#dfe6ef] bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <div className="text-sm font-bold text-[#172033]">Ngữ cảnh lớp</div>
+                <div className="text-sm text-[#667085]">
+                  {selectedClass ? `${selectedClass.name} · ${selectedClass.class_code ?? "Chưa có mã"}` : "Chọn lớp để xem dữ liệu"}
                 </div>
-                <div className="mt-3 text-3xl font-bold">{value as number}</div>
               </div>
-            ))}
+              <select
+                value={selectedClassId ?? ""}
+                onChange={(event) => setSelectedClassId(event.target.value || null)}
+                className="min-w-[260px] rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm font-semibold outline-none focus:border-[#1d73e8]"
+              >
+                {classes.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </section>
-
-          {showClassContext && (
-            <section className="rounded-xl border border-[#dfe6ef] bg-white p-4 shadow-sm">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="text-sm font-bold text-[#172033]">Ngữ cảnh lớp</div>
-                  <div className="text-sm text-[#667085]">
-                    {selectedClass ? `${selectedClass.name} · ${selectedClass.class_code ?? "Chưa có mã"}` : "Chọn lớp để xem dữ liệu"}
-                  </div>
-                </div>
-                <select
-                  value={selectedClassId ?? ""}
-                  onChange={(event) => setSelectedClassId(event.target.value || null)}
-                  className="min-w-[260px] rounded-lg border border-[#d0d8e4] px-3 py-2 text-sm font-semibold outline-none focus:border-[#1d73e8]"
-                >
-                  {classes.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </section>
-          )}
 
           {activeSection === "Tổng quan" ? (
             <TeacherOverview selectedClassId={selectedClassId} selectedClassName={selectedClass?.name} onOpenSection={handleOpenSection} onOpenStudentProfile={handleOpenStudentProfile} />

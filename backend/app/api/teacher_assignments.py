@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -24,6 +24,7 @@ from app.services.assignment_progress_service import (
     list_teacher_assignments,
     update_teacher_assignment,
 )
+from app.services.audit_service import AuditAction, commit_audit_event, get_request_context
 
 router = APIRouter(prefix="/teacher/assignments", tags=["teacher-assignments"])
 
@@ -105,6 +106,7 @@ def get_assignment_missing_children(
 def patch_assignment(
     assignment_id: UUID,
     payload: TeacherAssignmentUpdate,
+    request: Request,
     current_user: Annotated[User, Depends(require_teacher)],
     db: Annotated[Session, Depends(get_db)],
 ) -> TeacherAssignmentDetail:
@@ -127,20 +129,54 @@ def patch_assignment(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not detail:
         raise HTTPException(status_code=404, detail="ASSIGNMENT_NOT_FOUND")
+    commit_audit_event(
+        db,
+        action=AuditAction.ASSIGNMENT_UPDATED,
+        actor=current_user,
+        resource_type="ASSIGNMENT",
+        resource_id=assignment_id,
+        request_context=get_request_context(request),
+        metadata={"updated_fields": sorted(payload.model_fields_set), "status": detail.status},
+    )
     return detail
 
 
 @router.post("/{assignment_id}/worksheet", response_model=TeacherAssignmentDetail, status_code=status.HTTP_200_OK)
 def upload_assignment_worksheet(
     assignment_id: UUID,
+    request: Request,
     current_user: Annotated[User, Depends(require_teacher)],
     db: Annotated[Session, Depends(get_db)],
     file: Annotated[UploadFile, File()],
 ) -> TeacherAssignmentDetail:
     assignment = _assignment_or_404(db, current_user.id, assignment_id)
-    suffix = _validate_upload(file, {".pdf"}, {"application/pdf"})
+    try:
+        suffix = _validate_upload(file, {".pdf"}, {"application/pdf"})
+    except HTTPException as exc:
+        commit_audit_event(
+            db,
+            action=AuditAction.UPLOAD_INVALID,
+            actor=current_user,
+            result="FAILURE",
+            category="UPLOAD",
+            resource_type="ASSIGNMENT",
+            resource_id=assignment_id,
+            request_context=get_request_context(request),
+            metadata={"reason": exc.detail, "filename": file.filename},
+        )
+        raise
     assignment.worksheet_file_url = _save_assignment_file(file, "worksheets", suffix)
     db.commit()
+    commit_audit_event(
+        db,
+        action=AuditAction.ASSIGNMENT_FILE_UPLOADED,
+        actor=current_user,
+        category="UPLOAD",
+        resource_type="ASSIGNMENT",
+        resource_id=assignment_id,
+        request_context=get_request_context(request),
+        metadata={"file_type": "WORKSHEET", "filename": file.filename},
+    )
     detail = get_teacher_assignment_detail(db, current_user.id, assignment_id)
     if not detail:
         raise HTTPException(status_code=404, detail="ASSIGNMENT_NOT_FOUND")
@@ -150,18 +186,43 @@ def upload_assignment_worksheet(
 @router.post("/{assignment_id}/answer-template", response_model=TeacherAssignmentDetail, status_code=status.HTTP_200_OK)
 def upload_assignment_answer_template(
     assignment_id: UUID,
+    request: Request,
     current_user: Annotated[User, Depends(require_teacher)],
     db: Annotated[Session, Depends(get_db)],
     file: Annotated[UploadFile, File()],
 ) -> TeacherAssignmentDetail:
     assignment = _assignment_or_404(db, current_user.id, assignment_id)
-    suffix = _validate_upload(
-        file,
-        {".doc", ".docx"},
-        {"application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
-    )
+    try:
+        suffix = _validate_upload(
+            file,
+            {".doc", ".docx"},
+            {"application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+        )
+    except HTTPException as exc:
+        commit_audit_event(
+            db,
+            action=AuditAction.UPLOAD_INVALID,
+            actor=current_user,
+            result="FAILURE",
+            category="UPLOAD",
+            resource_type="ASSIGNMENT",
+            resource_id=assignment_id,
+            request_context=get_request_context(request),
+            metadata={"reason": exc.detail, "filename": file.filename},
+        )
+        raise
     assignment.answer_template_url = _save_assignment_file(file, "answer-templates", suffix)
     db.commit()
+    commit_audit_event(
+        db,
+        action=AuditAction.ASSIGNMENT_FILE_UPLOADED,
+        actor=current_user,
+        category="UPLOAD",
+        resource_type="ASSIGNMENT",
+        resource_id=assignment_id,
+        request_context=get_request_context(request),
+        metadata={"file_type": "ANSWER_TEMPLATE", "filename": file.filename},
+    )
     detail = get_teacher_assignment_detail(db, current_user.id, assignment_id)
     if not detail:
         raise HTTPException(status_code=404, detail="ASSIGNMENT_NOT_FOUND")

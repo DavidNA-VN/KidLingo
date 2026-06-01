@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -29,6 +29,7 @@ from app.schemas.parent import (
     ParentSubmissionHistoryItem,
 )
 from app.services.submission_types import GRADED_STATUSES, PDF_ANSWER
+from app.services.audit_service import AuditAction, commit_audit_event, get_request_context
 from app.services.assignment_status_service import close_overdue_assignments
 from app.services.parent_assignment_service import (
     get_child_assignment_detail,
@@ -99,6 +100,7 @@ def get_children(
 @router.post("/children", response_model=ParentChildPublic)
 def create_child(
     payload: ParentChildCreate,
+    request: Request,
     current_user: Annotated[User, Depends(require_parent)],
     db: Annotated[Session, Depends(get_db)],
 ) -> ParentChildPublic:
@@ -113,6 +115,14 @@ def create_child(
     )
     db.add(child)
     db.commit()
+    commit_audit_event(
+        db,
+        action=AuditAction.CHILD_PROFILE_CREATED,
+        actor=current_user,
+        resource_type="CHILD",
+        resource_id=child.id,
+        request_context=get_request_context(request),
+    )
     return next(item for item in list_parent_children(db, current_user.id) if item.id == child.id)
 
 
@@ -120,6 +130,7 @@ def create_child(
 def update_child(
     child_id: UUID,
     payload: ParentChildUpdate,
+    request: Request,
     current_user: Annotated[User, Depends(require_parent)],
     db: Annotated[Session, Depends(get_db)],
 ) -> ParentChildPublic:
@@ -142,6 +153,15 @@ def update_child(
             raise HTTPException(status_code=400, detail="INVALID_CHILD_STATUS")
         child.status = status_value
     db.commit()
+    commit_audit_event(
+        db,
+        action=AuditAction.CHILD_PROFILE_UPDATED,
+        actor=current_user,
+        resource_type="CHILD",
+        resource_id=child.id,
+        request_context=get_request_context(request),
+        metadata={"updated_fields": sorted(payload.model_fields_set)},
+    )
     return next(item for item in list_parent_children(db, current_user.id) if item.id == child_id)
 
 
@@ -149,6 +169,7 @@ def update_child(
 def join_class(
     child_id: UUID,
     payload: JoinClassRequest,
+    request: Request,
     current_user: Annotated[User, Depends(require_parent)],
     db: Annotated[Session, Depends(get_db)],
 ) -> ParentJoinClassResponse:
@@ -158,6 +179,15 @@ def join_class(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     if not result:
         raise HTTPException(status_code=404, detail="CHILD_NOT_FOUND")
+    commit_audit_event(
+        db,
+        action=AuditAction.CHILD_JOINED_CLASS,
+        actor=current_user,
+        resource_type="CLASS",
+        resource_id=result.class_id,
+        request_context=get_request_context(request),
+        metadata={"child_id": child_id, "already_joined": result.already_joined},
+    )
     return result
 
 
@@ -189,6 +219,7 @@ def get_child_assignments(
 def get_child_assignment(
     child_id: UUID,
     assignment_id: UUID,
+    request: Request,
     current_user: Annotated[User, Depends(require_parent)],
     db: Annotated[Session, Depends(get_db)],
 ) -> ParentAssignmentDetail:
@@ -239,7 +270,21 @@ def upload_assignment_submission_file(
     )
     if latest and latest.grading_status in GRADED_STATUSES:
         raise HTTPException(status_code=409, detail="SUBMISSION_ALREADY_GRADED")
-    suffix = _validate_answer_file(file)
+    try:
+        suffix = _validate_answer_file(file)
+    except HTTPException as exc:
+        commit_audit_event(
+            db,
+            action=AuditAction.UPLOAD_INVALID,
+            actor=current_user,
+            result="FAILURE",
+            category="UPLOAD",
+            resource_type="ASSIGNMENT",
+            resource_id=assignment_id,
+            request_context=get_request_context(request),
+            metadata={"reason": exc.detail, "filename": file.filename},
+        )
+        raise
     answer_url = _save_answer_file(file, suffix)
     if latest:
         submission = latest
@@ -263,6 +308,15 @@ def upload_assignment_submission_file(
 
     submission.submitted_at = datetime.now(timezone.utc)
     db.commit()
+    commit_audit_event(
+        db,
+        action=AuditAction.SUBMISSION_UPLOADED,
+        actor=current_user,
+        resource_type="SUBMISSION",
+        resource_id=submission.id,
+        request_context=get_request_context(request),
+        metadata={"assignment_id": assignment_id, "child_id": child_id, "submission_type": PDF_ANSWER},
+    )
     submissions = list_parent_child_submissions(db, current_user.id, child_id, limit=1)
     if not submissions:
         raise HTTPException(status_code=500, detail="SUBMISSION_NOT_SAVED")

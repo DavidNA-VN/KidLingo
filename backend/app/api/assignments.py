@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -15,6 +15,7 @@ from app.models.submission import Submission
 from app.models.user import User
 from app.schemas.assignment import AssignmentCreate, AssignmentDetail, AssignmentPublic, AssignmentUpdate
 from app.schemas.lesson import LessonMaterialPublic
+from app.services.audit_service import AuditAction, commit_audit_event, get_request_context
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
 
@@ -99,6 +100,7 @@ def _assignment_public(db: Session, assignment: Assignment, classroom: Class, le
 @router.post("", response_model=AssignmentPublic, status_code=status.HTTP_201_CREATED)
 def create_assignment(
     payload: AssignmentCreate,
+    request: Request,
     current_user: Annotated[User, Depends(require_teacher)],
     db: Annotated[Session, Depends(get_db)],
 ) -> AssignmentPublic:
@@ -131,6 +133,15 @@ def create_assignment(
         db.rollback()
         raise HTTPException(status_code=409, detail="ASSIGNMENT_ALREADY_EXISTS") from exc
     db.refresh(assignment)
+    commit_audit_event(
+        db,
+        action=AuditAction.ASSIGNMENT_CREATED,
+        actor=current_user,
+        resource_type="ASSIGNMENT",
+        resource_id=assignment.id,
+        request_context=get_request_context(request),
+        metadata={"class_id": assignment.class_id, "lesson_id": assignment.lesson_id, "status": assignment.status},
+    )
     return _assignment_public(db, assignment, classroom, lesson)
 
 
@@ -138,6 +149,7 @@ def create_assignment(
 def update_assignment(
     assignment_id: UUID,
     payload: AssignmentUpdate,
+    request: Request,
     current_user: Annotated[User, Depends(require_teacher)],
     db: Annotated[Session, Depends(get_db)],
 ) -> AssignmentPublic:
@@ -166,6 +178,15 @@ def update_assignment(
         assignment.status = status_value
     db.commit()
     db.refresh(assignment)
+    commit_audit_event(
+        db,
+        action=AuditAction.ASSIGNMENT_UPDATED,
+        actor=current_user,
+        resource_type="ASSIGNMENT",
+        resource_id=assignment.id,
+        request_context=get_request_context(request),
+        metadata={"updated_fields": sorted(payload.model_fields_set), "status": assignment.status},
+    )
     return _assignment_public(db, assignment, classroom, lesson)
 
 

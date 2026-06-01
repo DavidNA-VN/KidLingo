@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -26,6 +26,7 @@ from app.schemas.lesson import (
 )
 from app.services.vocabulary import VOCABULARY_CLASS_KEYS
 from app.services.youtube_service import extract_youtube_video_id
+from app.services.audit_service import AuditAction, commit_audit_event, get_request_context
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
 
@@ -102,6 +103,7 @@ def list_lessons(
 @router.post("", response_model=LessonPublic, status_code=status.HTTP_201_CREATED)
 def create_lesson(
     payload: LessonCreate,
+    request: Request,
     current_user: Annotated[User, Depends(require_teacher)],
     db: Annotated[Session, Depends(get_db)],
 ) -> LessonPublic:
@@ -116,6 +118,15 @@ def create_lesson(
     db.add(lesson)
     db.commit()
     db.refresh(lesson)
+    commit_audit_event(
+        db,
+        action=AuditAction.LESSON_CREATED,
+        actor=current_user,
+        resource_type="LESSON",
+        resource_id=lesson.id,
+        request_context=get_request_context(request),
+        metadata={"class_id": lesson.class_id},
+    )
     return _lesson_public(db, lesson)
 
 
@@ -139,6 +150,7 @@ def get_lesson(
 def update_lesson(
     lesson_id: UUID,
     payload: LessonUpdate,
+    request: Request,
     current_user: Annotated[User, Depends(require_teacher)],
     db: Annotated[Session, Depends(get_db)],
 ) -> LessonPublic:
@@ -149,12 +161,22 @@ def update_lesson(
         lesson.description = payload.description.strip() or None
     db.commit()
     db.refresh(lesson)
+    commit_audit_event(
+        db,
+        action=AuditAction.LESSON_UPDATED,
+        actor=current_user,
+        resource_type="LESSON",
+        resource_id=lesson.id,
+        request_context=get_request_context(request),
+        metadata={"updated_fields": sorted(payload.model_fields_set)},
+    )
     return _lesson_public(db, lesson)
 
 
 @router.post("/{lesson_id}/materials/pdf", response_model=LessonMaterialPublic, status_code=status.HTTP_201_CREATED)
 def upload_pdf_material(
     lesson_id: UUID,
+    request: Request,
     current_user: Annotated[User, Depends(require_teacher)],
     db: Annotated[Session, Depends(get_db)],
     file: Annotated[UploadFile, File()],
@@ -164,6 +186,17 @@ def upload_pdf_material(
 ) -> LessonMaterialPublic:
     _lesson_or_404(db, current_user.id, lesson_id)
     if file.content_type != "application/pdf" and not file.filename.lower().endswith(".pdf"):
+        commit_audit_event(
+            db,
+            action=AuditAction.UPLOAD_INVALID,
+            actor=current_user,
+            result="FAILURE",
+            category="UPLOAD",
+            resource_type="LESSON",
+            resource_id=lesson_id,
+            request_context=get_request_context(request),
+            metadata={"reason": "INVALID_FILE_TYPE", "filename": file.filename},
+        )
         raise HTTPException(status_code=400, detail="INVALID_FILE_TYPE")
 
     settings = get_settings()
@@ -185,6 +218,16 @@ def upload_pdf_material(
     db.add(material)
     db.commit()
     db.refresh(material)
+    commit_audit_event(
+        db,
+        action=AuditAction.LESSON_MATERIAL_UPLOADED,
+        actor=current_user,
+        category="UPLOAD",
+        resource_type="LESSON_MATERIAL",
+        resource_id=material.id,
+        request_context=get_request_context(request),
+        metadata={"lesson_id": lesson_id, "material_type": material.type, "filename": file.filename},
+    )
     return _material_to_public(material)
 
 
@@ -267,10 +310,21 @@ def update_material(
 def delete_material(
     lesson_id: UUID,
     material_id: UUID,
+    request: Request,
     current_user: Annotated[User, Depends(require_teacher)],
     db: Annotated[Session, Depends(get_db)],
 ) -> None:
     _lesson_or_404(db, current_user.id, lesson_id)
     material = _material_or_404(db, lesson_id, material_id)
+    material_type = material.type
     db.delete(material)
     db.commit()
+    commit_audit_event(
+        db,
+        action=AuditAction.LESSON_MATERIAL_DELETED,
+        actor=current_user,
+        resource_type="LESSON_MATERIAL",
+        resource_id=material_id,
+        request_context=get_request_context(request),
+        metadata={"lesson_id": lesson_id, "material_type": material_type},
+    )

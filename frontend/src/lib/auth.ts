@@ -1,12 +1,13 @@
 import { apiRequest } from "./api";
 
-export type UserRole = "TEACHER" | "PARENT";
+export type UserRole = "TEACHER" | "PARENT" | "ADMIN";
+export type PublicRegistrationRole = Exclude<UserRole, "ADMIN">;
 
 export type AuthUser = {
   id: string;
   email: string;
   full_name: string;
-  role: UserRole;
+  role: PublicRegistrationRole;
   avatar_url: string | null;
 };
 
