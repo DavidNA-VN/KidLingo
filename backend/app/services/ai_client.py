@@ -19,10 +19,37 @@ def predict_doodle(image_data_url: str, top_k: int = 3) -> dict[str, Any]:
     request = Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
 
     try:
-        with urlopen(request, timeout=20) as response:
+        with urlopen(request, timeout=60) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")
+        try:
+            parsed = json.loads(detail)
+            detail = parsed.get("detail", detail)
+        except json.JSONDecodeError:
+            pass
+        raise AIServiceError(str(detail or f"AI_SERVICE_HTTP_{exc.code}")) from exc
+    except TimeoutError as exc:
+        raise AIServiceError("AI_SERVICE_TIMEOUT") from exc
+    except URLError as exc:
+        raise AIServiceError("AI_SERVICE_UNAVAILABLE") from exc
+    except OSError as exc:
+        raise AIServiceError(f"AI_SERVICE_CONNECTION_FAILED: {exc}") from exc
+
+
+def get_ai_health() -> dict[str, Any]:
+    settings = get_settings()
+    url = f"{settings.ai_service_url.rstrip('/')}/health"
+    request = Request(url, headers={"Accept": "application/json"}, method="GET")
+    try:
+        with urlopen(request, timeout=60) as response:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="ignore")
         raise AIServiceError(detail or f"AI_SERVICE_HTTP_{exc.code}") from exc
+    except TimeoutError as exc:
+        raise AIServiceError("AI_SERVICE_TIMEOUT") from exc
     except URLError as exc:
         raise AIServiceError("AI_SERVICE_UNAVAILABLE") from exc
+    except OSError as exc:
+        raise AIServiceError(f"AI_SERVICE_CONNECTION_FAILED: {exc}") from exc

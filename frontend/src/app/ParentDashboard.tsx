@@ -86,6 +86,20 @@ function assignmentStatusLabel(status: string) {
   return labels[status] ?? status;
 }
 
+function getFriendlyAssignmentActionError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "ASSIGNMENT_CLOSED" || message.includes("ASSIGNMENT_CLOSED")) {
+    return "Bài tập đã hết hạn hoặc đã đóng, nên không thể nộp thêm bài.";
+  }
+  if (message === "FILE_TOO_LARGE" || message.includes("FILE_TOO_LARGE")) {
+    return "File quá lớn. Vui lòng chọn file nhỏ hơn.";
+  }
+  if (message === "INVALID_FILE_TYPE" || message.includes("INVALID_FILE_TYPE")) {
+    return "File chưa đúng định dạng. Vui lòng chọn .doc, .docx hoặc .pdf.";
+  }
+  return message || "Không nộp được phiếu trả lời";
+}
+
 function getFriendlyJoinClassError(error: unknown) {
   const message = error instanceof Error ? error.message : "";
   if (message === "CLASS_CODE_NOT_FOUND" || message.includes("404")) {
@@ -564,6 +578,11 @@ function ParentClassesPage({
                   )}
                   {assignmentDetail.latest_feedback && <div className="mt-2 text-[#344054]">{assignmentDetail.latest_feedback}</div>}
                 </div>
+                {isAssignmentClosed && (
+                  <div className="mt-4 rounded-lg border border-[#fedf89] bg-[#fffbeb] px-4 py-3 text-sm font-semibold text-[#b54708]">
+                    Bài tập đã hết hạn hoặc đã đóng, nên không thể nộp thêm bài. Bé vẫn có thể mở game để luyện tập.
+                  </div>
+                )}
                 {!isAssignmentClosed && (
                   <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
                     <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[#b8c4d6] px-3 py-3 text-sm font-semibold text-[#344054]">
@@ -740,7 +759,7 @@ export function ParentDashboard({ user, onLogout }: ParentDashboardProps) {
       await Promise.all([loadChildWorkspace(selectedChildId), loadAssignmentDetail(selectedChildId, assignmentDetail.assignment_id)]);
       setMessage("Đã nộp phiếu trả lời.");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Không nộp được phiếu trả lời");
+      setError(getFriendlyAssignmentActionError(requestError));
     }
   }
 

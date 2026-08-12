@@ -78,6 +78,23 @@ function LearningMaterial({ material }: { material: LessonMaterial }) {
   );
 }
 
+function getFriendlyAiError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (!message || message === "Request failed" || message.includes("Failed to fetch")) {
+    return "Chưa gọi được AI service. Vui lòng kiểm tra AI_SERVICE_URL trên Vercel hoặc mở AI service trên Render rồi thử lại.";
+  }
+  if (message.includes("AI_SERVICE_TIMEOUT")) {
+    return "AI service phản hồi quá chậm. Nếu dùng Render free, mở trang /health của AI service rồi thử lại.";
+  }
+  if (message.includes("AI_SERVICE_UNAVAILABLE")) {
+    return "AI service chưa sẵn sàng. Vui lòng kiểm tra service trên Render.";
+  }
+  if (message.includes("MODEL_NOT_LOADED")) {
+    return "AI model chưa load được checkpoint. Vui lòng kiểm tra /health của AI service.";
+  }
+  return message;
+}
+
 export function ChildLearningSession({ token, child, assignment, onBack, onCompleted }: ChildLearningSessionProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -192,7 +209,7 @@ export function ChildLearningSession({ token, child, assignment, onBack, onCompl
       setPrediction(result);
       setTranscript("");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Không nhận dạng được doodle");
+      setError(getFriendlyAiError(requestError));
     } finally {
       setIsPredicting(false);
     }

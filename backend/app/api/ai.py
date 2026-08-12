@@ -9,12 +9,20 @@ from app.core.database import get_db
 from app.core.security import require_parent
 from app.models.user import User
 from app.schemas.learning import DoodlePredictionRequest, DoodlePredictionResponse
-from app.services.ai_client import AIServiceError, predict_doodle
+from app.services.ai_client import AIServiceError, get_ai_health, predict_doodle
 from app.services.doodle_vocabulary import find_doodle_item
 from app.services.learning_service import get_learning_assignment
 from app.services.audit_service import AuditAction, commit_audit_event, get_request_context
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+
+@router.get("/health")
+def health() -> dict:
+    try:
+        return {"status": "ok", "ai_service": get_ai_health()}
+    except AIServiceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.post("/predict", response_model=DoodlePredictionResponse)
@@ -56,7 +64,9 @@ def predict(
     except AIServiceError as exc:
         detail = str(exc)
         if detail == "AI_SERVICE_UNAVAILABLE":
-            detail = "AI service chưa chạy. Hãy start ai-service ở port 8001 trước khi dùng doodle prediction."
+            detail = "AI service chưa sẵn sàng hoặc chưa cấu hình AI_SERVICE_URL trên Vercel."
+        elif detail == "AI_SERVICE_TIMEOUT":
+            detail = "AI service phản hồi quá chậm. Nếu dùng Render free, hãy mở /health của AI service rồi thử lại."
         commit_audit_event(
             db,
             action=AuditAction.AI_PREDICTION_FAILED,
