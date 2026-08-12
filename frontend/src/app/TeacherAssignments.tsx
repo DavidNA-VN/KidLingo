@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { getStoredToken } from "../lib/auth";
+import { publicFileUrl } from "../lib/files";
 import { listLessons, type LessonSummary } from "../lib/lessons";
 import type { TeacherClassSummary } from "../lib/teacher";
 import {
@@ -262,7 +263,7 @@ function AssignmentDetailPanel({
               <div className="text-xs font-bold uppercase text-[#1d73e8]">PDF đề bài</div>
               <div className="mt-1 break-words font-bold">{detail.worksheet_file_url ? "Đã upload worksheet" : "Chưa upload worksheet"}</div>
               {detail.worksheet_file_url && (
-                <a href={`http://localhost:8000${detail.worksheet_file_url}`} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-[#d0d8e4] px-3 py-2 text-xs font-bold text-[#344054] hover:bg-[#f8fafc]">
+                <a href={publicFileUrl(detail.worksheet_file_url) ?? undefined} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-[#d0d8e4] px-3 py-2 text-xs font-bold text-[#344054] hover:bg-[#f8fafc]">
                   Mở PDF
                 </a>
               )}
@@ -271,7 +272,7 @@ function AssignmentDetailPanel({
               <div className="text-xs font-bold uppercase text-[#1d73e8]">Phiếu trả lời</div>
               <div className="mt-1 break-words font-bold">{detail.answer_template_url ? "Đã upload file Word" : "Chưa upload file Word"}</div>
               {detail.answer_template_url && (
-                <a href={`http://localhost:8000${detail.answer_template_url}`} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-[#d0d8e4] px-3 py-2 text-xs font-bold text-[#344054] hover:bg-[#f8fafc]">
+                <a href={publicFileUrl(detail.answer_template_url) ?? undefined} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-[#d0d8e4] px-3 py-2 text-xs font-bold text-[#344054] hover:bg-[#f8fafc]">
                   Tải phiếu trả lời
                 </a>
               )}

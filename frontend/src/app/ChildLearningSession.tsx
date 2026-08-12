@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 
 import { DOODLE_ALPHABETS, DOODLE_VOCABULARY } from "../lib/doodleVocabulary";
+import { publicFileUrl } from "../lib/files";
 import { createSubmission, predictDoodle, type DoodlePrediction, type SubmissionResult } from "../lib/learning";
 import type { LessonMaterial, ParentAssignmentDetail, ParentChild } from "../lib/parent";
 import { isPronunciationPassed, speakEnglish, startEnglishRecognition } from "../lib/speech";
@@ -51,7 +52,7 @@ function LearningMaterial({ material }: { material: LessonMaterial }) {
         </span>
         {material.file_url && (
           <a
-            href={`http://localhost:8000${material.file_url}`}
+            href={publicFileUrl(material.file_url) ?? undefined}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1 rounded-lg border border-[#d0d8e4] px-2.5 py-1.5 text-xs font-bold text-[#344054] hover:bg-[#f8fafc]"

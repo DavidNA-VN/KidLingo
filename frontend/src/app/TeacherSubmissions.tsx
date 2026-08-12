@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, FileText, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { getStoredToken } from "../lib/auth";
+import { publicFileUrl } from "../lib/files";
 import { getTeacherClassDetail, type TeacherClassDetail, type TeacherClassSummary } from "../lib/teacher";
 import {
   getTeacherSubmissionDetail,
@@ -133,7 +134,7 @@ function SubmissionDetailPanel({
             <div className="rounded-lg bg-[#f8fafc] p-3">
               <div className="text-xs font-bold uppercase text-[#667085]">File trả lời</div>
               {detail.answer_file_url ? (
-                <a href={`http://localhost:8000${detail.answer_file_url}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-lg border border-[#d0d8e4] px-3 py-2 text-xs font-bold text-[#344054] hover:bg-white">
+                <a href={publicFileUrl(detail.answer_file_url) ?? undefined} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-lg border border-[#d0d8e4] px-3 py-2 text-xs font-bold text-[#344054] hover:bg-white">
                   Mở file đã nộp
                 </a>
               ) : (

@@ -24,6 +24,7 @@ import { ParentChatPanel } from "./ParentChatPanel";
 import { ParentProgressPanel } from "./ParentProgressPanel";
 import type { AuthUser } from "../lib/auth";
 import { getStoredToken } from "../lib/auth";
+import { publicFileUrl } from "../lib/files";
 import {
   createParentChild,
   getChildAssignmentDetail,
@@ -105,7 +106,7 @@ function MaterialCard({ material }: { material: LessonMaterial }) {
         </span>
         {material.file_url && (
           <a
-            href={`http://localhost:8000${material.file_url}`}
+            href={publicFileUrl(material.file_url) ?? undefined}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1 rounded-lg border border-[#d0d8e4] px-2.5 py-1.5 text-xs font-bold text-[#344054] hover:bg-[#f8fafc]"
@@ -542,13 +543,13 @@ function ParentClassesPage({
                 <h3 className="font-bold">Bài tập PDF</h3>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   {assignmentDetail.worksheet_file_url && (
-                    <a href={`http://localhost:8000${assignmentDetail.worksheet_file_url}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#d0d8e4] px-4 py-2.5 text-sm font-bold text-[#344054] hover:bg-[#f8fafc]">
+                    <a href={publicFileUrl(assignmentDetail.worksheet_file_url) ?? undefined} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#d0d8e4] px-4 py-2.5 text-sm font-bold text-[#344054] hover:bg-[#f8fafc]">
                       <FileText size={16} />
                       Tải đề bài PDF
                     </a>
                   )}
                   {assignmentDetail.answer_template_url && (
-                    <a href={`http://localhost:8000${assignmentDetail.answer_template_url}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#d0d8e4] px-4 py-2.5 text-sm font-bold text-[#344054] hover:bg-[#f8fafc]">
+                    <a href={publicFileUrl(assignmentDetail.answer_template_url) ?? undefined} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#d0d8e4] px-4 py-2.5 text-sm font-bold text-[#344054] hover:bg-[#f8fafc]">
                       <FileText size={16} />
                       Tải phiếu trả lời
                     </a>

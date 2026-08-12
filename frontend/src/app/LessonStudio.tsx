@@ -13,6 +13,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import { getStoredToken } from "../lib/auth";
+import { publicFileUrl } from "../lib/files";
 import {
   addYoutubeMaterial,
   createLesson,
@@ -47,7 +48,7 @@ function materialIcon(type: string) {
 }
 
 function materialHref(material: LessonMaterial) {
-  if (material.type === "PDF" && material.file_url) return `http://localhost:8000${material.file_url}`;
+  if (material.type === "PDF" && material.file_url) return publicFileUrl(material.file_url);
   if (material.type === "YOUTUBE_VIDEO" && material.external_url) return material.external_url;
   return null;
 }

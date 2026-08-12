@@ -15,6 +15,10 @@
       "destination": "/api/index.py"
     },
     {
+      "source": "/uploads/(.*)",
+      "destination": "/api/index.py"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
