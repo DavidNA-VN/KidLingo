@@ -3,7 +3,8 @@
   "private": true,
   "version": "0.0.1",
   "scripts": {
-    "dev:frontend": "pnpm --dir frontend dev",
-    "build:frontend": "pnpm --dir frontend build"
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "build:frontend": "npm --prefix frontend run build"
   }
 }

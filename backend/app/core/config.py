@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24
     upload_dir: str = Field(default="uploads", alias="UPLOAD_DIR")
     ai_service_url: str = Field(default="http://127.0.0.1:8001", alias="AI_SERVICE_URL")
+    allowed_origins: str = Field(
+        default="http://localhost:5173,http://127.0.0.1:5173",
+        alias="ALLOWED_ORIGINS",
+    )
 
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",
@@ -41,6 +45,10 @@ class Settings(BaseSettings):
         if not path.is_absolute():
             return ROOT_DIR / path
         return path
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]
 
 
 @lru_cache
