@@ -52,6 +52,23 @@ app.include_router(submissions_router, prefix=settings.api_v1_prefix)
 app.include_router(chat_router, prefix=settings.api_v1_prefix)
 app.include_router(chat_ws_router)
 
+# Vercel Services may route requests to this backend after removing the
+# public /api service prefix. Keep /v1 available for that deployment shape.
+app.include_router(health_router, prefix="/v1")
+app.include_router(auth_router, prefix="/v1")
+app.include_router(admin_router, prefix="/v1")
+app.include_router(teacher_router, prefix="/v1")
+app.include_router(parent_router, prefix="/v1")
+app.include_router(teacher_assignments_router, prefix="/v1")
+app.include_router(teacher_submissions_router, prefix="/v1")
+app.include_router(dashboard_router, prefix="/v1")
+app.include_router(vocabulary_router, prefix="/v1")
+app.include_router(lessons_router, prefix="/v1")
+app.include_router(assignments_router, prefix="/v1")
+app.include_router(ai_router, prefix="/v1")
+app.include_router(submissions_router, prefix="/v1")
+app.include_router(chat_router, prefix="/v1")
+
 
 @app.get("/")
 def root() -> dict[str, str]:
