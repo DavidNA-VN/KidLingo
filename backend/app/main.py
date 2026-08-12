@@ -69,6 +69,23 @@ app.include_router(ai_router, prefix="/v1")
 app.include_router(submissions_router, prefix="/v1")
 app.include_router(chat_router, prefix="/v1")
 
+# Classic Vercel rewrites keep the public /api prefix in the ASGI path.
+app.include_router(health_router, prefix="/api")
+app.include_router(health_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
+app.include_router(admin_router, prefix="/api/v1")
+app.include_router(teacher_router, prefix="/api/v1")
+app.include_router(parent_router, prefix="/api/v1")
+app.include_router(teacher_assignments_router, prefix="/api/v1")
+app.include_router(teacher_submissions_router, prefix="/api/v1")
+app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(vocabulary_router, prefix="/api/v1")
+app.include_router(lessons_router, prefix="/api/v1")
+app.include_router(assignments_router, prefix="/api/v1")
+app.include_router(ai_router, prefix="/api/v1")
+app.include_router(submissions_router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")
+
 
 @app.get("/")
 def root() -> dict[str, str]:
