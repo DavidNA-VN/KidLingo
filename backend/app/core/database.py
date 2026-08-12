@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from functools import lru_cache
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -10,13 +11,27 @@ class Base(DeclarativeBase):
     pass
 
 
-settings = get_settings()
-engine = create_engine(settings.sqlalchemy_database_url, pool_pre_ping=True)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+@lru_cache
+def get_engine():
+    settings = get_settings()
+    return create_engine(settings.sqlalchemy_database_url, pool_pre_ping=True)
+
+
+@lru_cache
+def get_session_local():
+    return sessionmaker(bind=get_engine(), autoflush=False, autocommit=False)
+
+
+class _SessionLocalProxy:
+    def __call__(self, *args, **kwargs):
+        return get_session_local()(*args, **kwargs)
+
+
+SessionLocal = _SessionLocalProxy()
 
 
 def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
+    db = get_session_local()()
     try:
         yield db
     finally:
@@ -24,7 +39,7 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def check_database() -> dict[str, str]:
-    with engine.connect() as connection:
+    with get_engine().connect() as connection:
         row = connection.execute(
             text("SELECT current_database() AS database, current_user AS username")
         ).mappings().one()

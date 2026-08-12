@@ -16,5 +16,5 @@ def database_health() -> dict[str, str]:
     try:
         db_info = check_database()
     except SQLAlchemyError as exc:
-        raise HTTPException(status_code=503, detail="Database unavailable") from exc
+        raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}") from exc
     return {"status": "ok", **db_info}
