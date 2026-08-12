@@ -1,5 +1,3 @@
-import shutil
-from pathlib import Path
 from typing import Annotated
 from uuid import UUID, uuid4
 
@@ -7,7 +5,6 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Reques
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import require_teacher
 from app.models.assignment import Assignment
@@ -27,6 +24,7 @@ from app.schemas.lesson import (
 from app.services.vocabulary import VOCABULARY_CLASS_KEYS
 from app.services.youtube_service import extract_youtube_video_id
 from app.services.audit_service import AuditAction, commit_audit_event, get_request_context
+from app.services.file_storage import save_upload_file
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
 
@@ -199,20 +197,15 @@ def upload_pdf_material(
         )
         raise HTTPException(status_code=400, detail="INVALID_FILE_TYPE")
 
-    settings = get_settings()
-    target_dir = settings.upload_path / "lesson-materials"
-    target_dir.mkdir(parents=True, exist_ok=True)
     safe_name = f"{uuid4()}.pdf"
-    target_path = target_dir / safe_name
-    with target_path.open("wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    file_url = save_upload_file(db, f"lesson-materials/{safe_name}", file)
 
     material = LessonMaterial(
         lesson_id=lesson_id,
         type="PDF",
         title=title.strip(),
         description=description.strip() if description else None,
-        file_url=f"/uploads/lesson-materials/{safe_name}",
+        file_url=file_url,
         sort_order=sort_order,
     )
     db.add(material)

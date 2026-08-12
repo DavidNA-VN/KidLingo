@@ -3,20 +3,19 @@ from __future__ import annotations
 import base64
 import binascii
 import uuid
-from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
 from app.models.assignment import Assignment
 from app.models.child import Child, ClassChild
 from app.models.classroom import Class
 from app.models.lesson import Lesson, LessonMaterial
 from app.models.submission import Submission
 from app.models.user import User
+from app.services.file_storage import save_upload_bytes
 
 
 def get_learning_assignment(
@@ -73,7 +72,7 @@ def calculate_reward(is_correct: bool, speech_passed: bool) -> tuple[int, int]:
     return 1, 3
 
 
-def save_canvas_image(image_data_url: str | None) -> str | None:
+def save_canvas_image(db: Session, image_data_url: str | None) -> str | None:
     if not image_data_url:
         return None
     if not image_data_url.startswith("data:image/png;base64,"):
@@ -84,21 +83,8 @@ def save_canvas_image(image_data_url: str | None) -> str | None:
     except (binascii.Error, ValueError) as exc:
         raise ValueError("INVALID_CANVAS_IMAGE") from exc
 
-    settings = get_settings()
-    target_dir = settings.upload_path / "submissions"
-    target_dir.mkdir(parents=True, exist_ok=True)
     filename = f"{uuid.uuid4()}.png"
-    target_path = target_dir / filename
-    _assert_inside_uploads(target_path, settings.upload_path)
-    target_path.write_bytes(raw)
-    return f"/uploads/submissions/{filename}"
-
-
-def _assert_inside_uploads(path: Path, upload_path: Path) -> None:
-    resolved_path = path.resolve()
-    resolved_root = upload_path.resolve()
-    if resolved_root not in resolved_path.parents and resolved_path != resolved_root:
-        raise ValueError("INVALID_UPLOAD_PATH")
+    return save_upload_bytes(db, f"submissions/{filename}", "image/png", raw)
 
 
 def build_submission_public(submission: Submission) -> dict[str, Any]:

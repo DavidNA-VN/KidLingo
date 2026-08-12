@@ -1,4 +1,3 @@
-import shutil
 from pathlib import Path
 from typing import Annotated
 from uuid import UUID
@@ -7,7 +6,6 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import require_parent
 from app.models.assignment import Assignment
@@ -44,6 +42,7 @@ from app.services.parent_progress_service import (
     get_parent_dashboard_summary,
     list_parent_child_submissions,
 )
+from app.services.file_storage import save_upload_file
 
 router = APIRouter(prefix="/parent", tags=["parent"])
 
@@ -68,17 +67,11 @@ def _validate_answer_file(file: UploadFile) -> str:
     return suffix or ".docx"
 
 
-def _save_answer_file(file: UploadFile, suffix: str) -> str:
+def _save_answer_file(db: Session, file: UploadFile, suffix: str) -> str:
     from uuid import uuid4
 
-    settings = get_settings()
-    target_dir = settings.upload_path / "submissions" / "answers"
-    target_dir.mkdir(parents=True, exist_ok=True)
     safe_name = f"{uuid4()}{suffix}"
-    target_path = target_dir / safe_name
-    with target_path.open("wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    return f"/uploads/submissions/answers/{safe_name}"
+    return save_upload_file(db, f"submissions/answers/{safe_name}", file)
 
 
 @router.get("/dashboard", response_model=ParentDashboardSummary)
@@ -285,7 +278,7 @@ def upload_assignment_submission_file(
             metadata={"reason": exc.detail, "filename": file.filename},
         )
         raise
-    answer_url = _save_answer_file(file, suffix)
+    answer_url = _save_answer_file(db, file, suffix)
     if latest:
         submission = latest
         submission.answer_file_url = answer_url

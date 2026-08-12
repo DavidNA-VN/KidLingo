@@ -1,4 +1,3 @@
-import shutil
 from pathlib import Path
 from typing import Annotated
 from uuid import UUID
@@ -7,7 +6,6 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Upl
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import require_teacher
 from app.models.assignment import Assignment
@@ -25,6 +23,7 @@ from app.services.assignment_progress_service import (
     update_teacher_assignment,
 )
 from app.services.audit_service import AuditAction, commit_audit_event, get_request_context
+from app.services.file_storage import save_upload_file
 
 router = APIRouter(prefix="/teacher/assignments", tags=["teacher-assignments"])
 
@@ -55,17 +54,11 @@ def _validate_upload(file: UploadFile, allowed_suffixes: set[str], allowed_conte
     return suffix or next(iter(allowed_suffixes))
 
 
-def _save_assignment_file(file: UploadFile, subdir: str, suffix: str) -> str:
-    settings = get_settings()
-    target_dir = settings.upload_path / "assignments" / subdir
-    target_dir.mkdir(parents=True, exist_ok=True)
+def _save_assignment_file(db: Session, file: UploadFile, subdir: str, suffix: str) -> str:
     from uuid import uuid4
 
     safe_name = f"{uuid4()}{suffix}"
-    target_path = target_dir / safe_name
-    with target_path.open("wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    return f"/uploads/assignments/{subdir}/{safe_name}"
+    return save_upload_file(db, f"assignments/{subdir}/{safe_name}", file)
 
 
 @router.get("", response_model=list[TeacherAssignmentListItem])
@@ -165,7 +158,7 @@ def upload_assignment_worksheet(
             metadata={"reason": exc.detail, "filename": file.filename},
         )
         raise
-    assignment.worksheet_file_url = _save_assignment_file(file, "worksheets", suffix)
+    assignment.worksheet_file_url = _save_assignment_file(db, file, "worksheets", suffix)
     db.commit()
     commit_audit_event(
         db,
@@ -211,7 +204,7 @@ def upload_assignment_answer_template(
             metadata={"reason": exc.detail, "filename": file.filename},
         )
         raise
-    assignment.answer_template_url = _save_assignment_file(file, "answer-templates", suffix)
+    assignment.answer_template_url = _save_assignment_file(db, file, "answer-templates", suffix)
     db.commit()
     commit_audit_event(
         db,

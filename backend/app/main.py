@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -15,6 +17,7 @@ from app.api.submissions import router as submissions_router
 from app.api.teacher import router as teacher_router
 from app.api.teacher_assignments import router as teacher_assignments_router
 from app.api.teacher_submissions import router as teacher_submissions_router
+from app.api.uploads import router as uploads_router
 from app.api.vocabulary import router as vocabulary_router
 from app.core.config import get_settings
 from app.ws.chat import router as chat_ws_router
@@ -32,8 +35,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-settings.upload_path.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=settings.upload_path), name="uploads")
+if os.getenv("VERCEL"):
+    app.include_router(uploads_router)
+else:
+    settings.upload_path.mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=settings.upload_path), name="uploads")
 
 app.include_router(health_router)
 app.include_router(health_router, prefix=settings.api_v1_prefix)

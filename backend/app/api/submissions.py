@@ -62,7 +62,7 @@ def create_submission(
     stars, coins = calculate_reward(is_correct, payload.speech_passed)
 
     try:
-        canvas_url = save_canvas_image(payload.canvas_image_data_url)
+        canvas_url = save_canvas_image(db, payload.canvas_image_data_url)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
