@@ -1,0 +1,13 @@
+ai-service/
+backend/
+database/
+docs/
+legacy/
+scripts/
+uploads/
+image/
+
+.env
+.env.*
+docker-compose.yml
+*.log
