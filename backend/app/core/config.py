@@ -1,4 +1,5 @@
 from functools import lru_cache
+import os
 from pathlib import Path
 
 from pydantic import Field
@@ -43,6 +44,8 @@ class Settings(BaseSettings):
     def upload_path(self) -> Path:
         path = Path(self.upload_dir)
         if not path.is_absolute():
+            if os.getenv("VERCEL") and self.upload_dir == "uploads":
+                return Path("/tmp/uploads")
             return ROOT_DIR / path
         return path
 
