@@ -24,7 +24,13 @@ def predict(
     current_user: Annotated[User, Depends(require_parent)],
     db: Annotated[Session, Depends(get_db)],
 ) -> DoodlePredictionResponse:
-    context = get_learning_assignment(db, current_user.id, payload.child_id, payload.assignment_id)
+    context = get_learning_assignment(
+        db,
+        current_user.id,
+        payload.child_id,
+        payload.assignment_id,
+        statuses=("PUBLISHED", "CLOSED"),
+    )
     if not context:
         raise HTTPException(status_code=404, detail="ASSIGNMENT_NOT_FOUND")
 

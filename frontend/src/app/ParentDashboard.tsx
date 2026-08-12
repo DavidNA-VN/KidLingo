@@ -532,7 +532,7 @@ function ParentClassesPage({
                     <p className="mt-1 text-sm text-[#667085]">{assignmentDetail.lesson_title} - {assignmentDetail.teacher_name}</p>
                     <p className="mt-3 rounded-lg bg-[#f8fafc] p-3 text-sm leading-6 text-[#344054]">{assignmentDetail.instructions ?? "Giáo viên chưa thêm hướng dẫn."}</p>
                   </div>
-                  <button onClick={() => onStartLearning(assignmentDetail)} disabled={isAssignmentClosed} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#12b76a] px-4 text-sm font-bold text-white hover:bg-[#0f9f5f] disabled:cursor-not-allowed disabled:bg-[#98a2b3]">
+                  <button onClick={() => onStartLearning(assignmentDetail)} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#12b76a] px-4 text-sm font-bold text-white hover:bg-[#0f9f5f]">
                     <PlayCircle size={17} />
                     Chơi game phát âm
                   </button>

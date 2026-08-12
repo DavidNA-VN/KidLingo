@@ -19,7 +19,11 @@ from app.services.file_storage import save_upload_bytes
 
 
 def get_learning_assignment(
-    db: Session, parent_id: UUID, child_id: UUID, assignment_id: UUID
+    db: Session,
+    parent_id: UUID,
+    child_id: UUID,
+    assignment_id: UUID,
+    statuses: tuple[str, ...] = ("PUBLISHED",),
 ) -> tuple[Child, Assignment, Class, User, Lesson, list[LessonMaterial]] | None:
     row = db.execute(
         select(Child, Assignment, Class, User, Lesson)
@@ -34,7 +38,7 @@ def get_learning_assignment(
             Child.status == "ACTIVE",
             ClassChild.status == "ACTIVE",
             Assignment.id == assignment_id,
-            Assignment.status == "PUBLISHED",
+            Assignment.status.in_(statuses),
         )
     ).first()
     if not row:

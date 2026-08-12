@@ -100,6 +100,7 @@ export function ChildLearningSession({ token, child, assignment, onBack, onCompl
   const [error, setError] = useState("");
 
   const isCorrectPrediction = Boolean(prediction?.is_correct);
+  const isAssignmentClosed = assignment.status === "CLOSED";
   const speechPassed = isCorrectPrediction ? isPronunciationPassed(transcript, targetItem.english) : false;
 
   useEffect(() => {
@@ -434,10 +435,16 @@ export function ChildLearningSession({ token, child, assignment, onBack, onCompl
                   </div>
                 </div>
 
-                <button onClick={handleSubmit} disabled={isSubmitting} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#12b76a] px-4 py-3 text-sm font-bold text-white hover:bg-[#0f9f5f] disabled:opacity-60">
-                  {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                  Nộp kết quả
-                </button>
+                {isAssignmentClosed ? (
+                  <div className="rounded-lg border border-[#d0d8e4] bg-[#f8fafc] px-4 py-3 text-sm font-semibold text-[#475467]">
+                    Bài đã đóng, bé vẫn có thể luyện tập nhưng không nộp thêm kết quả.
+                  </div>
+                ) : (
+                  <button onClick={handleSubmit} disabled={isSubmitting} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#12b76a] px-4 py-3 text-sm font-bold text-white hover:bg-[#0f9f5f] disabled:opacity-60">
+                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                    Nộp kết quả
+                  </button>
+                )}
               </div>
             )}
           </section>
